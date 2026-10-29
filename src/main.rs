@@ -1,3 +1,6 @@
-fn main() {
-    println!("Hello, world!");
+use rusqlite::{Connection, Result};
+
+fn main() -> Result<()> {
+    // do stuff
+    Ok(())
 }
