@@ -1,8 +1,18 @@
 # Plan
 
-1. initialize function
-2. rest
+## 1. initialize function
 
-### To do 
+- [ ] make db at ~/.local/share/vocab_trainer/vocab.db
 
-- [ ] make initialize function
+### db tables
+
+- [ ] for now: vocab, translation
+
+## 2. rest
+
+- [ ] add new vocabulary
+
+- [ ] check vocab
+
+## Done
+
