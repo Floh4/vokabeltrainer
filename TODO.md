@@ -14,5 +14,24 @@
 
 - [ ] check vocab
 
+## 3. technical design
+
+### DB schema
+First go for a naive approach? Simple table with one language
+|German|English|
+|--|--|
+|Hund|Dog|
+
+Mabe more columns with more languages?
+
+### Decisions
+- [x] select database system 
+  - ~~Network DB (MySQL etc.)?~~
+  - SQLite simple local DB?
+- [ ] User interface
+  -  Terminal
+  -  GUI (e. g. [egui](https://github.com/emilk/egui), looks simple)
+
+
 ## Done
 
