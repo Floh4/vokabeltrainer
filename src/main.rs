@@ -8,23 +8,26 @@ const DB_NAME: &str = "vocab.db";
 fn initialize(dir: &str) -> Result<()> {
     println!("No database found");
     println!("Initializing");
-    
+
     let path = Path::new(dir);
     fs::create_dir_all(dir).expect("Failed to create the app directory");
-    
+
     println!("Succesfully created app path");
     println!("Creating new Database");
-    
+
     let db = Connection::open(path.join(DB_NAME))?;
-    
+
     println!("Succesfully created new database!");
 
     // create tables
-    match db.execute("CREATE TABLE vocab (
+    match db.execute(
+        "CREATE TABLE vocab (
         id int PRIMARY KEY,
         vocabulary varchar(512),
         translation,
-        )", []) {
+        )",
+        [],
+    ) {
         Ok(v) => println!("Succesfully created table: {}", v),
         Err(e) => println!("Failed to create table: {}", e),
     }
