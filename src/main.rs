@@ -8,10 +8,18 @@ const DB_NAME: &str = "vocab.db";
 fn initialize(dir: &str) -> Result<()> {
     println!("No database found");
     println!("Initializing");
+    
     let path = Path::new(dir);
     fs::create_dir_all(dir).expect("Failed to create the app directory");
+    
+    println!("Succesfully created app path");
     println!("Creating new Database");
+    
     let db = Connection::open(path.join(DB_NAME))?;
+    
+    println!("Succesfully created new database!");
+
+    // create tables
 
     Ok(())
 }
@@ -26,7 +34,7 @@ fn main() -> Result<()> {
     if !app_dir.is_dir() {
         // app is run for the first time
         // initialize everything
-        initialize(app_dir.display().to_string().as_str());
+        initialize(app_dir.display().to_string().as_str()).expect("Failed to initialize");
     }
 
     // do stuff
