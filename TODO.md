@@ -14,6 +14,17 @@
 
 - [ ] check vocab
 
+### Feature ideas
+
+#### Provide statistics (success rate)
+|German|English|success rate|
+|--|--| --|
+|Hund|Dog|0.9|
+ |Nachbar|Neighbour|0.3|
+
+Vocabulary with low success rate could be chosen more often for testing.
+
+
 ## 3. technical design
 
 ### DB schema
