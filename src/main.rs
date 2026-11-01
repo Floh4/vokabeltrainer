@@ -23,8 +23,9 @@ fn initialize(dir: &str) -> Result<()> {
     match db.execute(
         "CREATE TABLE vocab (
         id int PRIMARY KEY,
-        vocabulary VARCHAR(512),
-        translation
+        Vocabulary VARCHAR(512),
+        Translation VARCHAR(512),
+        SuccesRate FLOAT(16)
         );",
         [],
     ) {
