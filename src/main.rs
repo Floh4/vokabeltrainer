@@ -35,6 +35,12 @@ fn initialize(dir: &str) -> Result<()> {
     Ok(())
 }
 
+#[test]
+fn reset() {
+    let path = env::home_dir().unwrap().join(".local/share/vocab_trainer/");
+    fs::remove_dir_all(path).unwrap();
+}
+
 fn main() -> Result<()> {
     // check if it is already initialized
     let app_dir = env::home_dir()
