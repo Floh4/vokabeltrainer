@@ -1,41 +1,39 @@
 use error::VocabError;
 use rusqlite::{Connection, Result};
-use std::fs;
-use std::path::Path;
 use std::env;
+use std::fs;
+use std::path::PathBuf;
 
 mod error;
 
 const DB_NAME: &str = "vocab.db";
 const DB_PATH_FROM_HOME: &str = ".local/share/vocab_trainer/";
 
-
-fn initialize(dir: &str) -> Result<(), VocabError> {
+fn initialize(dir: PathBuf) -> Result<(), VocabError> {
     println!("No database found");
     println!("Initializing");
 
-    let path = Path::new(dir);
-    fs::create_dir_all(dir)
-        .map_err(|e| VocabError::IoError(e))?;
+    fs::create_dir_all(dir.clone()).map_err(|e| VocabError::IoError(e))?;
 
     println!("Succesfully created app path");
     println!("Creating new Database");
 
-    let db = Connection::open(path.join(DB_NAME))
-        .map_err(|e| VocabError::DBError(e))?;
+    let db = Connection::open(dir.join(DB_NAME)).map_err(|e| VocabError::DBError(e))?;
 
     println!("Succesfully created new database!");
 
     // create tables
-    let size = db.execute(
-        "CREATE TABLE vocab (
+    let size = db
+        .execute(
+            "CREATE TABLE vocab (
         id int PRIMARY KEY,
         Vocabulary VARCHAR(512),
         Translation VARCHAR(512),
         SuccesRate FLOAT(16)
         );",
-        [],
-    ).map_err(|e| VocabError::DBError(e))?;
+            [],
+        )
+        .map_err(|e| VocabError::DBError(e))?;
 
     println!("Succesfully created table: {}", size);
     Ok(())
@@ -43,11 +41,9 @@ fn initialize(dir: &str) -> Result<(), VocabError> {
 
 #[test]
 fn test_initialize_fail_on_empty_db_name() {
-
-    let result = initialize("///");
+    let result = initialize("///".into());
     match result {
-        Err(e) => match e
-        {
+        Err(e) => match e {
             VocabError::DBError(_) => assert!(true),
             _ => assert!(false, "Result should be an DBError"),
         },
@@ -88,16 +84,20 @@ fn main() -> Result<()> {
     if !app_dir.is_dir() {
         // app is run for the first time
         // initialize everything
-        match initialize(app_dir.display().to_string().as_str())
-        {
-            Ok(_) => { println!("DB was initialized") }
-            Err(e) => match e
-            {
+        match initialize(app_dir) {
+            Ok(_) => {
+                println!("DB was initialized")
+            }
+            Err(e) => match e {
                 // At this point it's not that useful, but later
                 // our own Error type enables better error handling
-                VocabError::DBError(_) => { eprintln!("Failed to initialize DB") }
-                VocabError::IoError(_) => { eprintln!("IO error while initializing DB") }
-            }
+                VocabError::DBError(_) => {
+                    eprintln!("Failed to initialize DB")
+                }
+                VocabError::IoError(_) => {
+                    eprintln!("IO error while initializing DB")
+                }
+            },
         }
     }
 
