@@ -17,10 +17,10 @@
 ### Feature ideas
 
 #### Provide statistics (success rate)
-|German|English|success rate|
-|--|--| --|
-|Hund|Dog|0.9|
- |Nachbar|Neighbour|0.3|
+|German|English|success rate|vocab check count|correct|
+|--|--| --|--|--|
+|Hund|Dog|0.9|10|9|
+ |Nachbar|Neighbour|0.3|3|1|
 
 Vocabulary with low success rate could be chosen more often for testing.
 
