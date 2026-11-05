@@ -2,11 +2,11 @@
 
 ## 1. initialize function
 
-- [ ] make db at ~/.local/share/vocab_trainer/vocab.db
+- [x] make db at ~/.local/share/vocab_trainer/vocab.db
 
 ### db tables
 
-- [ ] for now: vocab, translation
+- [x] for now: vocab, translation
 
 ## 2. rest
 
@@ -42,7 +42,3 @@ Mabe more columns with more languages?
 - [ ] User interface
   -  Terminal
   -  GUI (e. g. [egui](https://github.com/emilk/egui), looks simple)
-
-
-## Done
-
