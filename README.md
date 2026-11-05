@@ -1,2 +1,2 @@
 # vokabeltrainer
-vokabeltrainer in rust geschrieben und mit datenbank als speicher
+A vocab trainer written in rust. It is using a sqlite database for storage.
