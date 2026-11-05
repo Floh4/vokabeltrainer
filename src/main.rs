@@ -29,7 +29,9 @@ fn initialize(dir: PathBuf) -> Result<(), VocabError> {
         id int PRIMARY KEY,
         Vocabulary VARCHAR(512),
         Translation VARCHAR(512),
-        SuccesRate FLOAT(16)
+        SuccesRate FLOAT(16),
+        VocabCheckCount int,
+        Corect int
         );",
             [],
         )
@@ -64,15 +66,35 @@ fn print_db() {
 
     let mut entrys: Vec<String> = Vec::new();
     while let Some(row) = rows.next().unwrap() {
-        entrys.push(row.get(0).unwrap());
+        entrys.push(row.get(0).unwrap()); 
     }
-    println!("{:?}", entrys);
+    assert!(true, "{:?}", entrys);
 }
 
 #[test]
 fn reset() {
     let path = env::home_dir().unwrap().join(DB_PATH_FROM_HOME);
     fs::remove_dir_all(path).unwrap();
+}
+
+fn add_vocab(conn: Connection, vocab: &str, translation: &str) -> Result<()> {
+    conn.execute("INSERT INTO vocab (Vocabulary, Translation, SuccesRate, VocabCheckCount, Corect)
+                  VALUES (?1, ?2, 0.0, 0, 0);", [vocab, translation])?;
+    Ok(())
+}
+
+#[test]
+fn test_add_vocab() {
+    let path = env::home_dir()
+        .unwrap()
+        .join(DB_PATH_FROM_HOME)
+        .join(DB_NAME);
+    let conn = Connection::open(path).unwrap();
+    let result = add_vocab(conn, "Dog", "Hund");
+    match result {
+        Ok(()) => assert!(true),
+        Err(e) => assert!(false, "couldnt execute sql statement: {}", e),
+    }
 }
 
 fn main() -> Result<()> {
