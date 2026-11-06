@@ -26,12 +26,12 @@ fn initialize(dir: PathBuf) -> Result<(), VocabError> {
     let size = db
         .execute(
             "CREATE TABLE vocab (
-        id int PRIMARY KEY,
-        Vocabulary VARCHAR(512),
-        Translation VARCHAR(512),
+        ID INTEGER PRIMARY KEY,
+        Vocabulary TEXT,
+        Translation TEXT,
         SuccesRate FLOAT(16),
-        VocabCheckCount int,
-        Corect int
+        VocabCheckCount INTEGER,
+        Corect INTEGER
         );",
             [],
         )
@@ -60,15 +60,12 @@ fn print_db() {
         .join(DB_PATH_FROM_HOME)
         .join(DB_NAME);
     let conn = Connection::open(path).unwrap();
-
     let mut stmt = conn.prepare("SELECT * FROM vocab").unwrap();
     let mut rows = stmt.query([]).unwrap();
 
-    let mut entrys: Vec<String> = Vec::new();
     while let Some(row) = rows.next().unwrap() {
-        entrys.push(row.get(0).unwrap());
+        println!("{:?}", row);
     }
-    assert!(true, "{:?}", entrys);
 }
 
 #[test]
@@ -80,7 +77,7 @@ fn reset() {
 fn add_vocab(conn: Connection, vocab: &str, translation: &str) -> Result<()> {
     conn.execute(
         "INSERT INTO vocab (Vocabulary, Translation, SuccesRate, VocabCheckCount, Corect)
-                  VALUES (?1, ?2, 0.0, 0, 0);",
+         VALUES (?1, ?2, 0.0, 0, 0);",
         [vocab, translation],
     )?;
     Ok(())
