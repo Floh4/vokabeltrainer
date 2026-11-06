@@ -66,7 +66,7 @@ fn print_db() {
 
     let mut entrys: Vec<String> = Vec::new();
     while let Some(row) = rows.next().unwrap() {
-        entrys.push(row.get(0).unwrap()); 
+        entrys.push(row.get(0).unwrap());
     }
     assert!(true, "{:?}", entrys);
 }
@@ -78,8 +78,11 @@ fn reset() {
 }
 
 fn add_vocab(conn: Connection, vocab: &str, translation: &str) -> Result<()> {
-    conn.execute("INSERT INTO vocab (Vocabulary, Translation, SuccesRate, VocabCheckCount, Corect)
-                  VALUES (?1, ?2, 0.0, 0, 0);", [vocab, translation])?;
+    conn.execute(
+        "INSERT INTO vocab (Vocabulary, Translation, SuccesRate, VocabCheckCount, Corect)
+                  VALUES (?1, ?2, 0.0, 0, 0);",
+        [vocab, translation],
+    )?;
     Ok(())
 }
 
