@@ -5,6 +5,7 @@ use std::fmt::{Display, Formatter};
 pub enum VocabError {
     DBError(rusqlite::Error),
     IoError(std::io::Error),
+    General(String),
 }
 
 impl Display for VocabError {
@@ -12,6 +13,7 @@ impl Display for VocabError {
         match self {
             VocabError::DBError(e) => e.fmt(f),
             VocabError::IoError(e) => e.fmt(f),
+            VocabError::General(e) => e.fmt(f),
         }
     }
 }
@@ -21,6 +23,7 @@ impl std::error::Error for VocabError {
         match self {
             VocabError::DBError(e) => Some(e),
             VocabError::IoError(e) => Some(e),
+            VocabError::General(_) => None,
         }
     }
 }

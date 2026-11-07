@@ -6,20 +6,55 @@ use std::path::PathBuf;
 
 mod error;
 
-const DB_NAME: &str = "vocab.db";
-const DB_PATH_FROM_HOME: &str = ".local/share/vocab_trainer/";
 
-fn create_db(path: PathBuf) -> Result<Connection, VocabError> {
-    let db = Connection::open(path).map_err(|e| VocabError::DBError(e))?;
 
-    println!("Succesfully created new database!");
 
-    // create tables
-    println!("Creating tables");
 
-    let size = db
-        .execute(
-            "CREATE TABLE vocab (
+
+trait  Datastore {
+    fn add_vocab(&mut self, vocab: &str, translation: &str) -> Result<()>;
+}
+
+struct SqlLiteDatastore
+{
+    conn: Connection,
+}
+
+impl SqlLiteDatastore {
+    const DB_NAME: &str = "vocab.db";
+    const DB_PATH_FROM_HOME: &str = ".local/share/vocab_trainer/";
+
+    fn create() -> Result<Self, VocabError>
+    {
+        Self::create_from_path(None, None)
+    }
+    fn create_from_path(path : Option<PathBuf>, db_name : Option<&str>) -> Result<Self, VocabError> {
+
+        let app_path = match path
+        {
+            Some(p) => p,
+            None => env::home_dir()
+                .ok_or(VocabError::General("failed to to get the path to the home directory".to_string()))?
+                .join(SqlLiteDatastore::DB_PATH_FROM_HOME)
+        };
+
+        let db_name = db_name.unwrap_or(SqlLiteDatastore::DB_NAME);
+
+        let conn = SqlLiteDatastore::initialize(app_path, db_name)?;
+        Ok(SqlLiteDatastore { conn })
+    }
+
+    fn create_db(path: PathBuf) -> Result<Connection, VocabError> {
+        let db = Connection::open(path).map_err(|e| VocabError::DBError(e))?;
+
+        println!("Succesfully created new database!");
+
+        // create tables
+        println!("Creating tables");
+
+        let size = db
+            .execute(
+                "CREATE TABLE vocab (
         ID INTEGER PRIMARY KEY,
         Vocabulary TEXT,
         Translation TEXT,
@@ -27,51 +62,55 @@ fn create_db(path: PathBuf) -> Result<Connection, VocabError> {
         VocabCheckCount INTEGER,
         Corect INTEGER
         );",
-            [],
-        )
-        .map_err(|e| VocabError::DBError(e))?;
+                [],
+            )
+            .map_err(|e| VocabError::DBError(e))?;
 
-    println!("Succesfully created table: {}", size);
-    Ok(db)
+        println!("Succesfully created table: {}", size);
+        Ok(db)
+    }
+
+    fn initialize(app_dir : PathBuf, db_name : &str) -> Result<Connection, VocabError> {
+
+        let db_path = app_dir.join(db_name);
+
+        if !app_dir.is_dir() {
+            // app is run for the first time
+            // initialize everything
+
+            println!("No database found");
+            println!("Initializing");
+
+            fs::create_dir_all(app_dir).map_err(|e| VocabError::IoError(e))?;
+
+            println!("Succesfully created app path");
+            println!("Creating new Database");
+
+            SqlLiteDatastore::create_db(db_path)
+        } else if !db_path.exists() {
+            // path exists but, not the database
+            SqlLiteDatastore::create_db(db_path)
+        } else {
+            let db = Connection::open(db_path).map_err(|e| VocabError::DBError(e))?;
+            Ok(db)
+        }
+    }
+
+
 }
 
-fn initialize() -> Result<Connection, VocabError> {
-    // check if it is already initialized
-    let app_dir = env::home_dir()
-        .expect("failed to to get the path to the home directory")
-        .join(DB_PATH_FROM_HOME);
-    let db_path = app_dir.join(DB_NAME);
+impl Datastore for SqlLiteDatastore {
 
-    if !app_dir.is_dir() {
-        // app is run for the first time
-        // initialize everything
-
-        println!("No database found");
-        println!("Initializing");
-
-        fs::create_dir_all(app_dir).map_err(|e| VocabError::IoError(e))?;
-
-        println!("Succesfully created app path");
-        println!("Creating new Database");
-
-        create_db(db_path)
-    } else if !db_path.exists() {
-        // path exists but, not the database
-        create_db(db_path)
-    } else {
-        let db = Connection::open(db_path).map_err(|e| VocabError::DBError(e))?;
-        Ok(db)
+    fn add_vocab(&mut self, vocab: &str, translation: &str) -> Result<()> {
+        self.conn.execute(
+            "INSERT INTO vocab (Vocabulary, Translation, SuccesRate, VocabCheckCount, Corect)
+         VALUES (?1, ?2, 0.0, 0, 0);",
+            [vocab, translation],
+        )?;
+        Ok(())
     }
 }
 
-fn add_vocab(conn: Connection, vocab: &str, translation: &str) -> Result<()> {
-    conn.execute(
-        "INSERT INTO vocab (Vocabulary, Translation, SuccesRate, VocabCheckCount, Corect)
-         VALUES (?1, ?2, 0.0, 0, 0);",
-        [vocab, translation],
-    )?;
-    Ok(())
-}
 
 fn main() -> Result<()> {
     /*
@@ -95,11 +134,15 @@ fn main() -> Result<()> {
     };
     */
 
-    let conn = initialize().unwrap(); // currently no better way to handle errors
-
+    let datastore = SqlLiteDatastore::create();
     // do stuff
 
     Ok(())
+}
+
+#[test]
+fn test_create_db() {
+    assert!(SqlLiteDatastore::create().is_ok());
 }
 
 // Tests
@@ -120,12 +163,8 @@ fn test_initialize_fail_on_empty_db_name() {
 #[test]
 // run: cargo test print_db -- --nocapture
 fn print_db() {
-    let path = env::home_dir()
-        .unwrap()
-        .join(DB_PATH_FROM_HOME)
-        .join(DB_NAME);
-    let conn = Connection::open(path).unwrap();
-    let mut stmt = conn.prepare("SELECT * FROM vocab").unwrap();
+    let datastore = SqlLiteDatastore::create_from_path(None, None).unwrap();
+    let mut stmt = datastore.conn.prepare("SELECT * FROM vocab").unwrap();
     let mut rows = stmt.query([]).unwrap();
 
     while let Some(row) = rows.next().unwrap() {
@@ -135,18 +174,14 @@ fn print_db() {
 
 #[test]
 fn reset() {
-    let path = env::home_dir().unwrap().join(DB_PATH_FROM_HOME);
+    let path = env::home_dir().unwrap().join(SqlLiteDatastore::DB_PATH_FROM_HOME);
     fs::remove_dir_all(path).unwrap();
 }
 
 #[test]
 fn test_add_vocab() {
-    let path = env::home_dir()
-        .unwrap()
-        .join(DB_PATH_FROM_HOME)
-        .join(DB_NAME);
-    let conn = Connection::open(path).unwrap();
-    let result = add_vocab(conn, "Dog", "Hund");
+    let mut datastore = SqlLiteDatastore::create().unwrap();
+    let result = datastore.add_vocab("Dog", "Hund");
     match result {
         Ok(()) => assert!(true),
         Err(e) => assert!(false, "couldnt execute sql statement: {}", e),
