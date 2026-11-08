@@ -43,5 +43,5 @@ Mabe more columns with more languages?
   - ~~Network DB (MySQL etc.)?~~
   - SQLite simple local DB?
 - [ ] User interface
-  -  Terminal
+  -  Terminal: [ratatui](https://github.com/ratatui/ratatui)
   -  GUI (e. g. [egui](https://github.com/emilk/egui), looks simple)
