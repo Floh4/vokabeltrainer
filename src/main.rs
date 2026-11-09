@@ -94,15 +94,37 @@ impl SqlLiteDatastore {
 
 impl Datastore for SqlLiteDatastore {
     fn add_vocab(&mut self, vocab: &str, translation: &str) -> Result<(), VocabError> {
-        // TODO: return a VocabErroe when you try to add the same vocab twice(see fn get_word)
-        self.conn
+        // TODO: return a VocabError when you try to add the same vocab twice(see fn get_word)
+        // check if vocab is already in the db
+        let mut stmt = self
+            .conn
+            .prepare(
+                "SELECT VOCABULARY
+                 FROM vocab
+                 WHERE VOCABULARY = 1?",
+            )
+            .map_err(|e| VocabError::DBError(e))?;
+        let mut rows = stmt.query([vocab]).map_err(|e| VocabError::DBError(e))?;
+        let row = rows.next().map_err(|e| VocabError::DBError(e))?;
+
+        if let Some(row) = rows.next().map_err(|e| VocabError::DBError(e))?
+            && row.get(0).map_err(|e| VocabError::DBError(e))? == vocab
+        {
+            Err(VocabError::General(
+                "Cant add the same vocabulary twice".to_string(),
+            ))
+            // TODO: Maybe add another error type for better error handling(eg. ask for a different
+            // vocab
+        } else {
+            self.conn
             .execute(
                 "INSERT INTO vocab (Vocabulary, Translation, SuccesRate, VocabCheckCount, Corect)
                  VALUES (?1, ?2, 0.0, 0, 0);",
                 [vocab, translation],
             )
             .map_err(|e| VocabError::DBError(e))?;
-        Ok(())
+            Ok(())
+        }
     }
     fn get_word(&mut self, word: &str) -> Result<String, VocabError> {
         let mut stmt = self
