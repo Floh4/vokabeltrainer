@@ -13,10 +13,10 @@
 - [x] add new vocabulary
 
 - [ ] check vocab:
- - [x] function to get words(everytime the function was succesfully called it should add 1 to the vocab check count)
- - [ ] function that gives a random word and pass that word to the get word function
- - [ ] update function(calculates the succes rate, etc.)
- - [ ] make an ui
+  - [x] function to get words(everytime the function was succesfully called it should add 1 to the vocab check count)
+  - [ ] function that gives a random word and pass that word to the get word function
+  - [ ] update function(calculates the succes rate, etc.)
+  - [ ] make an ui
 
 
 ### Feature ideas
