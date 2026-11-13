@@ -130,27 +130,6 @@ impl Datastore for SqlLiteDatastore {
 }
 
 fn main() -> Result<()> {
-    /*
-    let conn = match initialize() {
-        Ok(db) => {
-            println!("DB was initialized");
-            db
-        }
-        Err(e) => match e {
-            // At this point it's not that useful, but later
-            // our own Error type enables better error handling.
-            // Currently it wont work because it expects
-            // a Connection.
-            VocabError::DBError(_) => {
-                eprintln!("Failed to initialize DB")
-            }
-            VocabError::IoError(_) => {
-                eprintln!("IO error while initializing DB")
-            }
-        },
-    };
-    */
-
     let datastore = SqlLiteDatastore::create();
     // do stuff
 
@@ -217,16 +196,15 @@ fn test_get_solution() {
         Err(e) => assert!(false, "Error: {}", e),
     }
 }
-/* Wont work because the intitialize function changed
 #[test]
-fn test_initialize_fail_on_empty_db_name() {
-    let result = initialize("///".into());
-    match result {
-        Err(e) => match e {
-            VocabError::DBError(_) => assert!(true),
-            _ => assert!(false, "Result should be an DBError"),
-        },
-        _ => assert!(false, "Result should be an error!"),
-    }
+// run: cargo test list -- --nocapture
+fn list() {
+    // lists all available tests
+    println!("list                              list all tests");
+    println!("  print_db                        ! run: cargo test -- --nocapture");
+    println!("  reset                           ! use carefully: deletes the database");
+    println!("  test_add_vocab                  adds new vocabulary");
+    println!("  test_create_db                  creates new db");
+    println!("  test_get_solution               get the translation of the word");
+    assert!(true);
 }
-*/
