@@ -127,26 +127,20 @@ impl Datastore for SqlLiteDatastore {
         }
     }
     fn get_solution(&mut self, word: &str) -> Result<String, VocabError> {
-        let mut stmt = self
-            .conn
-            .prepare(
-                "SELECT Translation 
-                 FROM vocab
-                 WHERE Vocabulary = ?1",
-            )
-            .map_err(|e| VocabError::DBError(e))?;
-        let mut rows = stmt.query([word]).map_err(|e| VocabError::DBError(e))?;
-        let mut words: Vec<String> = Vec::with_capacity(1);
-        // we expect that the vocabulary is unique
-        while let Some(row) = rows.next().map_err(|e| VocabError::DBError(e))? {
-            words.push(row.get(0).map_err(|e| VocabError::DBError(e))?);
-        }
-        if words.len() == 0 {
-            Err(VocabError::General(
-                format!("Couldnt find this vocabulary: {}", word).to_string(),
-            ))
-        } else {
-            Ok(<String as Clone>::clone(&words[0])) // return the first word that was found
+        match self.conn.query_row(
+            "SELECT Translation
+             FROM vocab
+             WHERE Vocabulary = ?1",
+            [word],
+            |row| row.get::<usize, String>(0),
+        ) {
+            Ok(v) => Ok(v),
+            Err(err) => match err {
+                rusqlite::Error::QueryReturnedNoRows => Err(VocabError::General(
+                    "Couldnt find the word. Help: try adding it".to_string(),
+                )), // This wont need its own error type, because this function wont be using User input
+                e => Err(VocabError::DBError(e)),
+            },
         }
     }
 }
@@ -202,7 +196,7 @@ fn test_add_vocab() {
 fn test_get_solution() {
     let mut datastore = SqlLiteDatastore::create().unwrap();
     match datastore.get_solution("Door") {
-        Ok(_) => assert!(false, "should not have found that vocabulary"),
+        Ok(v) => assert!(false, "should not have found that vocabulary: {}", v),
         Err(e) => match e {
             VocabError::General(_) => assert!(true),
             e => assert!(false, "Error: {}", e),
@@ -211,13 +205,10 @@ fn test_get_solution() {
     datastore.add_vocab("Door", "Tür").unwrap(); // create new word
     let word = datastore.get_solution("Door"); // get the word
     match word {
-        Ok(v) => {
-            if v == "Tür" {
-                assert!(true)
-            } else {
-                assert!(false, "It should be 'Tür'")
-            }
-        }
+        Ok(v) => match v {
+            val if val == "Tür".to_string() => assert!(true),
+            s => assert!(false, "It should be 'Tür', but it is: {}", s),
+        },
         Err(e) => assert!(false, "Error: {}", e),
     }
 }
