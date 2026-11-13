@@ -10,7 +10,7 @@ trait Datastore {
     fn add_vocab(&mut self, vocab: &str, translation: &str) -> Result<(), VocabError>;
     // TODO: fn update
     //       - should update the vocabulary status(succes rate, corect, ...)
-    fn get_word(&mut self, word: &str) -> Result<String, VocabError>;
+    fn get_solution(&mut self, word: &str) -> Result<String, VocabError>;
 }
 
 struct SqlLiteDatastore {
@@ -126,11 +126,11 @@ impl Datastore for SqlLiteDatastore {
             Ok(())
         }
     }
-    fn get_word(&mut self, word: &str) -> Result<String, VocabError> {
+    fn get_solution(&mut self, word: &str) -> Result<String, VocabError> {
         let mut stmt = self
             .conn
             .prepare(
-                "SELECT Vocabulary 
+                "SELECT Translation 
                  FROM vocab
                  WHERE Vocabulary = ?1",
             )
@@ -152,27 +152,6 @@ impl Datastore for SqlLiteDatastore {
 }
 
 fn main() -> Result<()> {
-    /*
-    let conn = match initialize() {
-        Ok(db) => {
-            println!("DB was initialized");
-            db
-        }
-        Err(e) => match e {
-            // At this point it's not that useful, but later
-            // our own Error type enables better error handling.
-            // Currently it wont work because it expects
-            // a Connection.
-            VocabError::DBError(_) => {
-                eprintln!("Failed to initialize DB")
-            }
-            VocabError::IoError(_) => {
-                eprintln!("IO error while initializing DB")
-            }
-        },
-    };
-    */
-
     let datastore = SqlLiteDatastore::create();
     // do stuff
 
@@ -217,9 +196,9 @@ fn test_add_vocab() {
 
 #[test]
 // The Test expects that the database is empty
-fn test_get_word() {
+fn test_get_solution() {
     let mut datastore = SqlLiteDatastore::create().unwrap();
-    match datastore.get_word("Door") {
+    match datastore.get_solution("Door") {
         Ok(_) => assert!(false, "should not have found that vocabulary"),
         Err(e) => match e {
             VocabError::General(_) => assert!(true),
@@ -227,22 +206,27 @@ fn test_get_word() {
         },
     };
     datastore.add_vocab("Door", "Tür").unwrap(); // create new word
-    let word = datastore.get_word("Door"); // get the word
+    let word = datastore.get_solution("Door"); // get the word
     match word {
-        Ok(_) => assert!(true),
+        Ok(w) => {
+            if w == "Tür" {
+                assert!(true)
+            } else {
+                assert!(false, "It should be 'Tür'")
+            }
+        }
         Err(e) => assert!(false, "Error: {}", e),
     }
 }
-/* Wont work because the intitialize function changed
 #[test]
-fn test_initialize_fail_on_empty_db_name() {
-    let result = initialize("///".into());
-    match result {
-        Err(e) => match e {
-            VocabError::DBError(_) => assert!(true),
-            _ => assert!(false, "Result should be an DBError"),
-        },
-        _ => assert!(false, "Result should be an error!"),
-    }
+// run: cargo test list -- --nocapture
+fn list() {
+    // lists all available tests
+    println!("list                              list all tests");
+    println!("  print_db                        ! run: cargo test -- --nocapture");
+    println!("  reset                           ! use carefully: deletes the database");
+    println!("  test_add_vocab                  adds new vocabulary");
+    println!("  test_create_db                  creates new db");
+    println!("  test_get_solution               get the translation of the word");
+    assert!(true);
 }
-*/
