@@ -10,7 +10,7 @@ trait Datastore {
     fn add_vocab(&mut self, vocab: &str, translation: &str) -> Result<(), VocabError>;
     // TODO: fn update
     //       - should update the vocabulary status(succes rate, corect, ...)
-    fn get_word(&mut self, word: &str) -> Result<String, VocabError>;
+    fn get_solution(&mut self, word: &str) -> Result<String, VocabError>;
 }
 
 struct SqlLiteDatastore {
@@ -104,11 +104,11 @@ impl Datastore for SqlLiteDatastore {
             .map_err(|e| VocabError::DBError(e))?;
         Ok(())
     }
-    fn get_word(&mut self, word: &str) -> Result<String, VocabError> {
+    fn get_solution(&mut self, word: &str) -> Result<String, VocabError> {
         let mut stmt = self
             .conn
             .prepare(
-                "SELECT Vocabulary 
+                "SELECT Translation 
                  FROM vocab
                  WHERE Vocabulary = ?1",
             )
@@ -195,9 +195,9 @@ fn test_add_vocab() {
 
 #[test]
 // The Test expects that the database is empty
-fn test_get_word() {
+fn test_get_solution() {
     let mut datastore = SqlLiteDatastore::create().unwrap();
-    match datastore.get_word("Door") {
+    match datastore.get_solution("Door") {
         Ok(_) => assert!(false, "should not have found that vocabulary"),
         Err(e) => match e {
             VocabError::General(_) => assert!(true),
@@ -205,9 +205,15 @@ fn test_get_word() {
         },
     };
     datastore.add_vocab("Door", "Tür").unwrap(); // create new word
-    let word = datastore.get_word("Door"); // get the word
+    let word = datastore.get_solution("Door"); // get the word
     match word {
-        Ok(_) => assert!(true),
+        Ok(w) => {
+            if w == "Tür" {
+                assert!(true)
+            } else {
+                assert!(false, "It should be 'Tür'")
+            }
+        }
         Err(e) => assert!(false, "Error: {}", e),
     }
 }
