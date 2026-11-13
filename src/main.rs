@@ -7,7 +7,10 @@ use std::path::PathBuf;
 mod error;
 
 trait Datastore {
-    fn add_vocab(&mut self, vocab: &str, translation: &str) -> Result<()>;
+    fn add_vocab(&mut self, vocab: &str, translation: &str) -> Result<(), VocabError>;
+    // TODO: fn update
+    //       - should update the vocabulary status(succes rate, corect, ...)
+    fn get_solution(&mut self, word: &str) -> Result<String, VocabError>;
 }
 
 struct SqlLiteDatastore {
@@ -90,13 +93,39 @@ impl SqlLiteDatastore {
 }
 
 impl Datastore for SqlLiteDatastore {
-    fn add_vocab(&mut self, vocab: &str, translation: &str) -> Result<()> {
-        self.conn.execute(
-            "INSERT INTO vocab (Vocabulary, Translation, SuccesRate, VocabCheckCount, Corect)
-             VALUES (?1, ?2, 0.0, 0, 0);",
-            [vocab, translation],
-        )?;
+    fn add_vocab(&mut self, vocab: &str, translation: &str) -> Result<(), VocabError> {
+        // TODO: return a VocabErroe when you try to add the same vocab twice(see fn get_word)
+        self.conn
+            .execute(
+                "INSERT INTO vocab (Vocabulary, Translation, SuccesRate, VocabCheckCount, Corect)
+                 VALUES (?1, ?2, 0.0, 0, 0);",
+                [vocab, translation],
+            )
+            .map_err(|e| VocabError::DBError(e))?;
         Ok(())
+    }
+    fn get_solution(&mut self, word: &str) -> Result<String, VocabError> {
+        let mut stmt = self
+            .conn
+            .prepare(
+                "SELECT Translation 
+                 FROM vocab
+                 WHERE Vocabulary = ?1",
+            )
+            .map_err(|e| VocabError::DBError(e))?;
+        let mut rows = stmt.query([word]).map_err(|e| VocabError::DBError(e))?;
+        let mut words: Vec<String> = Vec::with_capacity(1);
+        // we expect that the vocabulary is unique
+        while let Some(row) = rows.next().map_err(|e| VocabError::DBError(e))? {
+            words.push(row.get(0).map_err(|e| VocabError::DBError(e))?);
+        }
+        if words.len() == 0 {
+            Err(VocabError::General(
+                format!("Couldnt find this vocabulary: {}", word).to_string(),
+            ))
+        } else {
+            Ok(<String as Clone>::clone(&words[0])) // return the first word that was found
+        }
     }
 }
 
@@ -164,6 +193,30 @@ fn test_add_vocab() {
     }
 }
 
+#[test]
+// The Test expects that the database is empty
+fn test_get_solution() {
+    let mut datastore = SqlLiteDatastore::create().unwrap();
+    match datastore.get_solution("Door") {
+        Ok(_) => assert!(false, "should not have found that vocabulary"),
+        Err(e) => match e {
+            VocabError::General(_) => assert!(true),
+            e => assert!(false, "Error: {}", e),
+        },
+    };
+    datastore.add_vocab("Door", "Tür").unwrap(); // create new word
+    let word = datastore.get_solution("Door"); // get the word
+    match word {
+        Ok(w) => {
+            if w == "Tür" {
+                assert!(true)
+            } else {
+                assert!(false, "It should be 'Tür'")
+            }
+        }
+        Err(e) => assert!(false, "Error: {}", e),
+    }
+}
 /* Wont work because the intitialize function changed
 #[test]
 fn test_initialize_fail_on_empty_db_name() {
