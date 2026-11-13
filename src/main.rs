@@ -42,12 +42,10 @@ impl SqlLiteDatastore {
 
     fn create_db(path: PathBuf) -> Result<Connection, VocabError> {
         let db = Connection::open(path).map_err(|e| VocabError::DBError(e))?;
-
         println!("Succesfully created new database!");
 
         // create tables
         println!("Creating tables");
-
         let size = db
             .execute(
                 "CREATE TABLE vocab (
@@ -61,14 +59,12 @@ impl SqlLiteDatastore {
                 [],
             )
             .map_err(|e| VocabError::DBError(e))?;
-
         println!("Succesfully created table: {}", size);
         Ok(db)
     }
 
     fn initialize(app_dir: PathBuf, db_name: &str) -> Result<Connection, VocabError> {
         let db_path = app_dir.join(db_name);
-
         if !app_dir.is_dir() {
             // app is run for the first time
             // initialize everything
@@ -94,36 +90,40 @@ impl SqlLiteDatastore {
 
 impl Datastore for SqlLiteDatastore {
     fn add_vocab(&mut self, vocab: &str, translation: &str) -> Result<(), VocabError> {
-        // TODO: return a VocabError when you try to add the same vocab twice(see fn get_word)
-        // check if vocab is already in the db
-        let mut stmt = self
-            .conn
-            .prepare(
-                "SELECT VOCABULARY
-                 FROM vocab
-                 WHERE VOCABULARY = 1?",
-            )
-            .map_err(|e| VocabError::DBError(e))?;
-        let mut rows = stmt.query([vocab]).map_err(|e| VocabError::DBError(e))?;
-        let row = rows.next().map_err(|e| VocabError::DBError(e))?;
+        match self.conn.query_row(
+            "SELECT Vocabulary
+             FROM vocab
+             WHERE Vocabulary = ?1",
+            [vocab],
+            |row| row.get::<usize, String>(0),
+        ) {
+            Ok(_) =>
+            // vocab exists
+            {
+                Err(VocabError::UniqueVocab(
+                    "This vocab already exists".to_string(),
+                ))
+            }
+            Err(err) => match err {
+                rusqlite::Error::QueryReturnedNoRows =>
+                // vocab doesnt exist
+                {
+                    self.conn
+                    .execute(
+                        "INSERT INTO vocab (Vocabulary, Translation, SuccesRate, VocabCheckCount, Corect)
+                         VALUES (?1, ?2, 0.0, 0, 0);",
+                        [vocab, translation],
+                    )
+                    .map_err(|e| VocabError::DBError(e))?;
+                    Ok(())
+                }
 
-        if let Some(row) = rows.next().map_err(|e| VocabError::DBError(e))?
-            && row.get(0).map_err(|e| VocabError::DBError(e))? == vocab
-        {
-            Err(VocabError::General(
-                "Cant add the same vocabulary twice".to_string(),
-            ))
-            // TODO: Maybe add another error type for better error handling(eg. ask for a different
-            // vocab
-        } else {
-            self.conn
-            .execute(
-                "INSERT INTO vocab (Vocabulary, Translation, SuccesRate, VocabCheckCount, Corect)
-                 VALUES (?1, ?2, 0.0, 0, 0);",
-                [vocab, translation],
-            )
-            .map_err(|e| VocabError::DBError(e))?;
-            Ok(())
+                e =>
+                // sql error
+                {
+                    Err(VocabError::DBError(e))
+                }
+            },
         }
     }
     fn get_solution(&mut self, word: &str) -> Result<String, VocabError> {
@@ -170,7 +170,6 @@ fn print_db() {
     let datastore = SqlLiteDatastore::create_from_path(None, None).unwrap();
     let mut stmt = datastore.conn.prepare("SELECT * FROM vocab").unwrap();
     let mut rows = stmt.query([]).unwrap();
-
     while let Some(row) = rows.next().unwrap() {
         println!("{:?}", row);
     }
@@ -190,7 +189,11 @@ fn test_add_vocab() {
     let result = datastore.add_vocab("Dog", "Hund");
     match result {
         Ok(()) => assert!(true),
-        Err(e) => assert!(false, "couldnt execute sql statement: {}", e),
+        Err(e) => match e {
+            VocabError::UniqueVocab(e) => assert!(false, "Error: {}", e),
+            VocabError::DBError(e) => assert!(false, "Database Error: {}", e),
+            e => assert!(false, "Different Error occurred: {}", e),
+        },
     }
 }
 
@@ -208,8 +211,8 @@ fn test_get_solution() {
     datastore.add_vocab("Door", "Tür").unwrap(); // create new word
     let word = datastore.get_solution("Door"); // get the word
     match word {
-        Ok(w) => {
-            if w == "Tür" {
+        Ok(v) => {
+            if v == "Tür" {
                 assert!(true)
             } else {
                 assert!(false, "It should be 'Tür'")
