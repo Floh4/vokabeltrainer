@@ -9,7 +9,7 @@ mod error;
 trait Datastore {
     fn add_vocab(&mut self, vocab: &str, translation: &str) -> Result<(), VocabError>;
     // TODO: fn update
-    //       - should update the vocabulary status(succes rate, corect, ...)
+    //       - should update the vocabulary status(corect, ...)
     fn get_solution(&mut self, word: &str) -> Result<String, VocabError>;
 }
 
@@ -52,7 +52,6 @@ impl SqlLiteDatastore {
                  ID INTEGER PRIMARY KEY,
                  Vocabulary TEXT,
                  Translation TEXT,
-                 SuccesRate FLOAT(16),
                  VocabCheckCount INTEGER,
                  Corect INTEGER
                  );",
@@ -110,8 +109,8 @@ impl Datastore for SqlLiteDatastore {
                 {
                     self.conn
                     .execute(
-                        "INSERT INTO vocab (Vocabulary, Translation, SuccesRate, VocabCheckCount, Corect)
-                         VALUES (?1, ?2, 0.0, 0, 0);",
+                        "INSERT INTO vocab (Vocabulary, Translation, VocabCheckCount, Corect)
+                         VALUES (?1, ?2, 0, 0);",
                         [vocab, translation],
                     )
                     .map_err(|e| VocabError::DBError(e))?;

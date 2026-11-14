@@ -22,10 +22,10 @@
 ### Feature ideas
 
 #### Provide statistics (success rate)
-|German|English|success rate|vocab check count|corect|
-|--|--| --|--|--|
-|Hund|Dog|0.9|10|9|
- |Nachbar|Neighbour|0.3|3|1|
+|German|English|vocab check count|corect|
+|--|--|--|--|
+|Hund|Dog|10|9|
+ |Nachbar|Neighbour|3|1|
 
 Vocabulary with low success rate could be chosen more often for testing.
 
