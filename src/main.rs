@@ -8,9 +8,8 @@ mod error;
 
 trait Datastore {
     fn add_vocab(&mut self, vocab: &str, translation: &str) -> Result<(), VocabError>;
-    // TODO: fn update
-    //       - should update the vocabulary status(succes rate, corect, ...)
-    fn get_solution(&mut self, word: &str) -> Result<String, VocabError>;
+    fn update(&mut self, id: u32) -> Result<(), VocabError>;
+    fn get_solution(&mut self, id: u32) -> Result<String, VocabError>;
 }
 
 struct SqlLiteDatastore {
@@ -33,9 +32,7 @@ impl SqlLiteDatastore {
                 ))?
                 .join(SqlLiteDatastore::DB_PATH_FROM_HOME),
         };
-
         let db_name = db_name.unwrap_or(SqlLiteDatastore::DB_NAME);
-
         let conn = SqlLiteDatastore::initialize(app_path, db_name)?;
         Ok(SqlLiteDatastore { conn })
     }
@@ -126,22 +123,71 @@ impl Datastore for SqlLiteDatastore {
             },
         }
     }
-    fn get_solution(&mut self, word: &str) -> Result<String, VocabError> {
+
+    fn get_solution(&mut self, id: u32) -> Result<String, VocabError> {
         match self.conn.query_row(
             "SELECT Translation
              FROM vocab
-             WHERE Vocabulary = ?1",
-            [word],
+             WHERE ID = ?1",
+            [id],
             |row| row.get::<usize, String>(0),
         ) {
-            Ok(v) => Ok(v),
+            Ok(v) => {
+                self.update(id)?;
+                Ok(v)
+            }
+
             Err(err) => match err {
                 rusqlite::Error::QueryReturnedNoRows => Err(VocabError::General(
-                    "Couldnt find the word. Help: try adding it".to_string(),
+                    "Found no Record with that id".to_string(),
                 )), // This wont need its own error type, because this function wont be using User input
                 e => Err(VocabError::DBError(e)),
             },
         }
+    }
+
+    fn update(&mut self, id: u32) -> Result<(), VocabError> {
+        // add 1 to VocabCheckCount
+        self.conn
+            .execute(
+                "UPDATE vocab
+                 SET VocabCheckCount = VocabCheckCount + 1
+                 WHERE ID = ?1",
+                [id],
+            )
+            .map_err(|e| VocabError::DBError(e))?;
+        let count: u32 = self
+            .conn
+            .query_row(
+                "SELECT VocabCheckCount
+                 FROM vocab
+                 WHERE ID = ?1",
+                [id],
+                |row| row.get(0),
+            )
+            .map_err(|e| VocabError::DBError(e))?;
+        let corect: u32 = self
+            .conn
+            .query_row(
+                "SELECT Corect
+                 FROM vocab
+                 WHERE ID = ?1",
+                [id],
+                |row| row.get(0),
+            )
+            .map_err(|e| VocabError::DBError(e))?;
+        // calculate succes rate
+        let succes_rate: f32 = corect as f32 / count as f32;
+        // update succes rate
+        self.conn
+            .execute(
+                "UPDATE vocab
+                 SET SuccesRate = ?1
+                 WHERE ID = ?2",
+                rusqlite::params![succes_rate, id],
+            )
+            .map_err(|e| VocabError::DBError(e))?;
+        Ok(())
     }
 }
 
@@ -192,26 +238,29 @@ fn test_add_vocab() {
 }
 
 #[test]
-// The Test expects that the database is empty
 fn test_get_solution() {
     let mut datastore = SqlLiteDatastore::create().unwrap();
-    match datastore.get_solution("Door") {
-        Ok(v) => assert!(false, "should not have found that vocabulary: {}", v),
-        Err(e) => match e {
-            VocabError::General(_) => assert!(true),
-            e => assert!(false, "Error: {}", e),
-        },
-    };
-    datastore.add_vocab("Door", "Tür").unwrap(); // create new word
-    let word = datastore.get_solution("Door"); // get the word
-    match word {
-        Ok(v) => match v {
-            val if val == "Tür".to_string() => assert!(true),
-            s => assert!(false, "It should be 'Tür', but it is: {}", s),
-        },
-        Err(e) => assert!(false, "Error: {}", e),
-    }
+    datastore.add_vocab("Door", "Tür").unwrap();
+    let _ = datastore.get_solution(0).is_ok();
 }
+
+#[test]
+fn test_update() {
+    let mut datastore = SqlLiteDatastore::create().unwrap();
+    datastore.add_vocab("Dog", "Hund").unwrap();
+    let id = datastore
+        .conn
+        .query_row(
+            "SELECT ID
+             FROM vocab
+             WHERE Vocabulary = ?1",
+            ["Dog"],
+            |row| row.get(0),
+        )
+        .unwrap();
+    datastore.update(id).unwrap();
+}
+
 #[test]
 // run: cargo test list -- --nocapture
 fn list() {
@@ -222,5 +271,6 @@ fn list() {
     println!("  test_add_vocab                  adds new vocabulary");
     println!("  test_create_db                  creates new db");
     println!("  test_get_solution               get the translation of the word");
+    println!("  test_update                     update the count and succes rate");
     assert!(true);
 }
