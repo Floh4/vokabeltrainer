@@ -7,6 +7,7 @@ trait Datastore {
     fn add_vocab(&mut self, vocab: &str, translation: &str) -> rusqlite::Result<(), VocabError>;
     //fn update(&mut self, id: u32) -> rusqlite::Result<(), VocabError>;
     fn get_solution(&mut self, word: String) -> rusqlite::Result<String, VocabError>;
+    fn id_to_word(&mut self, id: u32) -> Result<String, VocabError>;
 }
 
 pub struct SqlLiteDatastore {
@@ -20,7 +21,10 @@ impl SqlLiteDatastore {
     pub(crate) fn create() -> rusqlite::Result<Self, VocabError> {
         Self::create_from_path(None, None)
     }
-    fn create_from_path(path: Option<PathBuf>, db_name: Option<&str>) -> rusqlite::Result<Self, VocabError> {
+    fn create_from_path(
+        path: Option<PathBuf>,
+        db_name: Option<&str>,
+    ) -> rusqlite::Result<Self, VocabError> {
         let app_path = match path {
             Some(p) => p,
             None => env::home_dir()
@@ -102,12 +106,12 @@ impl Datastore for SqlLiteDatastore {
                 // vocab doesnt exist
                 {
                     self.conn
-                    .execute(
-                        "INSERT INTO vocab (Vocabulary, Translation, VocabCheckCount, Corect)
-                         VALUES (?1, ?2, 0, 0);",
-                        [vocab, translation],
-                    )
-                    .map_err(|e| VocabError::DBError(e))?;
+                        .execute(
+                            "INSERT INTO vocab (Vocabulary, Translation, VocabCheckCount, Corect)
+                             VALUES (?1, ?2, 0, 0);",
+                            [vocab, translation],
+                        )
+                        .map_err(|e| VocabError::DBError(e))?;
                     Ok(())
                 }
 
@@ -134,50 +138,63 @@ impl Datastore for SqlLiteDatastore {
             }
 
             Err(err) => match err {
-                rusqlite::Error::QueryReturnedNoRows => Err(VocabError::General(
-                    "Couldnt find the word".to_string(),
-                )), // This wont need its own error type, because this function wont be using User input
+                rusqlite::Error::QueryReturnedNoRows => {
+                    Err(VocabError::General("Couldnt find the word".to_string()))
+                } // This wont need its own error type, because this function wont be using User input
                 e => Err(VocabError::DBError(e)),
             },
         }
     }
-    /* This functiom is currently useless, because there is nothing that needs to be updated
-    fn update(&mut self, id: u32) -> rusqlite::Result<(), VocabError> {
-        // add 1 to VocabCheckCount
+
+    fn id_to_word(&mut self, id: u32) -> Result<String, VocabError> {
         self.conn
-            .execute(
-                "UPDATE vocab
+            .query_row(
+                "SELECT Vocabulary
+                 FROM vocab
+                 WHERE ID = ?1",
+                [id],
+                |row| row.get(0),
+            )
+            .map_err(|e| VocabError::DBError(e))
+    }
+
+    /* This functiom is currently useless, because there is nothing that needs to be updated
+        fn update(&mut self, id: u32) -> rusqlite::Result<(), VocabError> {
+            // add 1 to VocabCheckCount
+            self.conn
+                .execute(
+                    "UPDATE vocab
                  SET VocabCheckCount = VocabCheckCount + 1
                  WHERE ID = ?1",
-                [id],
-            )
-            .map_err(|e| VocabError::DBError(e))?;
-        /* 
-         *
-        let count: u32 = self
-            .conn
-            .query_row(
-                "SELECT VocabCheckCount
+                    [id],
+                )
+                .map_err(|e| VocabError::DBError(e))?;
+            /*
+             *
+            let count: u32 = self
+                .conn
+                .query_row(
+                    "SELECT VocabCheckCount
                  FROM vocab
                  WHERE ID = ?1",
-                [id],
-                |row| row.get(0),
-            )
-            .map_err(|e| VocabError::DBError(e))?;
-        let corect: u32 = self
-            .conn
-            .query_row(
-                "SELECT Corect
+                    [id],
+                    |row| row.get(0),
+                )
+                .map_err(|e| VocabError::DBError(e))?;
+            let corect: u32 = self
+                .conn
+                .query_row(
+                    "SELECT Corect
                  FROM vocab
                  WHERE ID = ?1",
-                [id],
-                |row| row.get(0),
-            )
-            .map_err(|e| VocabError::DBError(e))?;
-        */
-        Ok(())
-    }
-*/
+                    [id],
+                    |row| row.get(0),
+                )
+                .map_err(|e| VocabError::DBError(e))?;
+            */
+            Ok(())
+        }
+    */
 }
 
 // Tests

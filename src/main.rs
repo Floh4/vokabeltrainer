@@ -1,8 +1,8 @@
 use datastore::SqlLiteDatastore;
 use rusqlite::Result;
 
-mod error;
 mod datastore;
+mod error;
 
 fn main() -> Result<()> {
     let datastore = SqlLiteDatastore::create();
