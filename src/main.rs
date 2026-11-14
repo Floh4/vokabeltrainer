@@ -42,12 +42,10 @@ impl SqlLiteDatastore {
 
     fn create_db(path: PathBuf) -> Result<Connection, VocabError> {
         let db = Connection::open(path).map_err(|e| VocabError::DBError(e))?;
-
         println!("Succesfully created new database!");
 
         // create tables
         println!("Creating tables");
-
         let size = db
             .execute(
                 "CREATE TABLE vocab (
@@ -61,14 +59,12 @@ impl SqlLiteDatastore {
                 [],
             )
             .map_err(|e| VocabError::DBError(e))?;
-
         println!("Succesfully created table: {}", size);
         Ok(db)
     }
 
     fn initialize(app_dir: PathBuf, db_name: &str) -> Result<Connection, VocabError> {
         let db_path = app_dir.join(db_name);
-
         if !app_dir.is_dir() {
             // app is run for the first time
             // initialize everything
@@ -94,37 +90,57 @@ impl SqlLiteDatastore {
 
 impl Datastore for SqlLiteDatastore {
     fn add_vocab(&mut self, vocab: &str, translation: &str) -> Result<(), VocabError> {
-        // TODO: return a VocabErroe when you try to add the same vocab twice(see fn get_word)
-        self.conn
-            .execute(
-                "INSERT INTO vocab (Vocabulary, Translation, SuccesRate, VocabCheckCount, Corect)
-                 VALUES (?1, ?2, 0.0, 0, 0);",
-                [vocab, translation],
-            )
-            .map_err(|e| VocabError::DBError(e))?;
-        Ok(())
+        match self.conn.query_row(
+            "SELECT Vocabulary
+             FROM vocab
+             WHERE Vocabulary = ?1",
+            [vocab],
+            |row| row.get::<usize, String>(0),
+        ) {
+            Ok(_) =>
+            // vocab exists
+            {
+                Err(VocabError::UniqueVocab(
+                    "This vocab already exists".to_string(),
+                ))
+            }
+            Err(err) => match err {
+                rusqlite::Error::QueryReturnedNoRows =>
+                // vocab doesnt exist
+                {
+                    self.conn
+                    .execute(
+                        "INSERT INTO vocab (Vocabulary, Translation, SuccesRate, VocabCheckCount, Corect)
+                         VALUES (?1, ?2, 0.0, 0, 0);",
+                        [vocab, translation],
+                    )
+                    .map_err(|e| VocabError::DBError(e))?;
+                    Ok(())
+                }
+
+                e =>
+                // sql error
+                {
+                    Err(VocabError::DBError(e))
+                }
+            },
+        }
     }
     fn get_solution(&mut self, word: &str) -> Result<String, VocabError> {
-        let mut stmt = self
-            .conn
-            .prepare(
-                "SELECT Translation 
-                 FROM vocab
-                 WHERE Vocabulary = ?1",
-            )
-            .map_err(|e| VocabError::DBError(e))?;
-        let mut rows = stmt.query([word]).map_err(|e| VocabError::DBError(e))?;
-        let mut words: Vec<String> = Vec::with_capacity(1);
-        // we expect that the vocabulary is unique
-        while let Some(row) = rows.next().map_err(|e| VocabError::DBError(e))? {
-            words.push(row.get(0).map_err(|e| VocabError::DBError(e))?);
-        }
-        if words.len() == 0 {
-            Err(VocabError::General(
-                format!("Couldnt find this vocabulary: {}", word).to_string(),
-            ))
-        } else {
-            Ok(<String as Clone>::clone(&words[0])) // return the first word that was found
+        match self.conn.query_row(
+            "SELECT Translation
+             FROM vocab
+             WHERE Vocabulary = ?1",
+            [word],
+            |row| row.get::<usize, String>(0),
+        ) {
+            Ok(v) => Ok(v),
+            Err(err) => match err {
+                rusqlite::Error::QueryReturnedNoRows => Err(VocabError::General(
+                    "Couldnt find the word. Help: try adding it".to_string(),
+                )), // This wont need its own error type, because this function wont be using User input
+                e => Err(VocabError::DBError(e)),
+            },
         }
     }
 }
@@ -148,7 +164,6 @@ fn print_db() {
     let datastore = SqlLiteDatastore::create_from_path(None, None).unwrap();
     let mut stmt = datastore.conn.prepare("SELECT * FROM vocab").unwrap();
     let mut rows = stmt.query([]).unwrap();
-
     while let Some(row) = rows.next().unwrap() {
         println!("{:?}", row);
     }
@@ -168,7 +183,11 @@ fn test_add_vocab() {
     let result = datastore.add_vocab("Dog", "Hund");
     match result {
         Ok(()) => assert!(true),
-        Err(e) => assert!(false, "couldnt execute sql statement: {}", e),
+        Err(e) => match e {
+            VocabError::UniqueVocab(e) => assert!(false, "Error: {}", e),
+            VocabError::DBError(e) => assert!(false, "Database Error: {}", e),
+            e => assert!(false, "Different Error occurred: {}", e),
+        },
     }
 }
 
@@ -177,7 +196,7 @@ fn test_add_vocab() {
 fn test_get_solution() {
     let mut datastore = SqlLiteDatastore::create().unwrap();
     match datastore.get_solution("Door") {
-        Ok(_) => assert!(false, "should not have found that vocabulary"),
+        Ok(v) => assert!(false, "should not have found that vocabulary: {}", v),
         Err(e) => match e {
             VocabError::General(_) => assert!(true),
             e => assert!(false, "Error: {}", e),
@@ -186,13 +205,10 @@ fn test_get_solution() {
     datastore.add_vocab("Door", "Tür").unwrap(); // create new word
     let word = datastore.get_solution("Door"); // get the word
     match word {
-        Ok(w) => {
-            if w == "Tür" {
-                assert!(true)
-            } else {
-                assert!(false, "It should be 'Tür'")
-            }
-        }
+        Ok(v) => match v {
+            val if val == "Tür".to_string() => assert!(true),
+            s => assert!(false, "It should be 'Tür', but it is: {}", s),
+        },
         Err(e) => assert!(false, "Error: {}", e),
     }
 }

@@ -6,6 +6,7 @@ pub enum VocabError {
     DBError(rusqlite::Error),
     IoError(std::io::Error),
     General(String),
+    UniqueVocab(String),
 }
 
 impl Display for VocabError {
@@ -14,6 +15,7 @@ impl Display for VocabError {
             VocabError::DBError(e) => e.fmt(f),
             VocabError::IoError(e) => e.fmt(f),
             VocabError::General(e) => e.fmt(f),
+            VocabError::UniqueVocab(e) => e.fmt(f),
         }
     }
 }
@@ -24,6 +26,7 @@ impl std::error::Error for VocabError {
             VocabError::DBError(e) => Some(e),
             VocabError::IoError(e) => Some(e),
             VocabError::General(_) => None,
+            VocabError::UniqueVocab(_) => None,
         }
     }
 }
