@@ -49,7 +49,6 @@ impl SqlLiteDatastore {
                  ID INTEGER PRIMARY KEY,
                  Vocabulary TEXT,
                  Translation TEXT,
-                 SuccesRate FLOAT(16),
                  VocabCheckCount INTEGER,
                  Corect INTEGER
                  );",
@@ -107,8 +106,8 @@ impl Datastore for SqlLiteDatastore {
                 {
                     self.conn
                     .execute(
-                        "INSERT INTO vocab (Vocabulary, Translation, SuccesRate, VocabCheckCount, Corect)
-                         VALUES (?1, ?2, 0.0, 0, 0);",
+                        "INSERT INTO vocab (Vocabulary, Translation, VocabCheckCount, Corect)
+                         VALUES (?1, ?2, 0, 0);",
                         [vocab, translation],
                     )
                     .map_err(|e| VocabError::DBError(e))?;
@@ -174,17 +173,6 @@ impl Datastore for SqlLiteDatastore {
                  WHERE ID = ?1",
                 [id],
                 |row| row.get(0),
-            )
-            .map_err(|e| VocabError::DBError(e))?;
-        // calculate succes rate
-        let succes_rate: f32 = corect as f32 / count as f32;
-        // update succes rate
-        self.conn
-            .execute(
-                "UPDATE vocab
-                 SET SuccesRate = ?1
-                 WHERE ID = ?2",
-                rusqlite::params![succes_rate, id],
             )
             .map_err(|e| VocabError::DBError(e))?;
         Ok(())
@@ -271,6 +259,6 @@ fn list() {
     println!("  test_add_vocab                  adds new vocabulary");
     println!("  test_create_db                  creates new db");
     println!("  test_get_solution               get the translation of the word");
-    println!("  test_update                     update the count and succes rate");
+    println!("  test_update                     update the count");
     assert!(true);
 }
