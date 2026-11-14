@@ -5,8 +5,8 @@ use std::{env, fs};
 
 trait Datastore {
     fn add_vocab(&mut self, vocab: &str, translation: &str) -> rusqlite::Result<(), VocabError>;
-    fn update(&mut self, id: u32) -> rusqlite::Result<(), VocabError>;
-    fn get_solution(&mut self, id: u32) -> rusqlite::Result<String, VocabError>;
+    //fn update(&mut self, id: u32) -> rusqlite::Result<(), VocabError>;
+    fn get_solution(&mut self, word: String) -> rusqlite::Result<String, VocabError>;
 }
 
 pub struct SqlLiteDatastore {
@@ -120,28 +120,28 @@ impl Datastore for SqlLiteDatastore {
         }
     }
 
-    fn get_solution(&mut self, id: u32) -> rusqlite::Result<String, VocabError> {
+    fn get_solution(&mut self, word: String) -> rusqlite::Result<String, VocabError> {
         match self.conn.query_row(
             "SELECT Translation
              FROM vocab
-             WHERE ID = ?1",
-            [id],
+             WHERE Vocabulary = ?1",
+            [word],
             |row| row.get::<usize, String>(0),
         ) {
             Ok(v) => {
-                self.update(id)?;
+                //self.update(id)?;
                 Ok(v)
             }
 
             Err(err) => match err {
                 rusqlite::Error::QueryReturnedNoRows => Err(VocabError::General(
-                    "Found no Record with that id".to_string(),
+                    "Couldnt find the word".to_string(),
                 )), // This wont need its own error type, because this function wont be using User input
                 e => Err(VocabError::DBError(e)),
             },
         }
     }
-
+    /* This functiom is currently useless, because there is nothing that needs to be updated
     fn update(&mut self, id: u32) -> rusqlite::Result<(), VocabError> {
         // add 1 to VocabCheckCount
         self.conn
@@ -152,6 +152,8 @@ impl Datastore for SqlLiteDatastore {
                 [id],
             )
             .map_err(|e| VocabError::DBError(e))?;
+        /* 
+         *
         let count: u32 = self
             .conn
             .query_row(
@@ -172,8 +174,10 @@ impl Datastore for SqlLiteDatastore {
                 |row| row.get(0),
             )
             .map_err(|e| VocabError::DBError(e))?;
+        */
         Ok(())
     }
+*/
 }
 
 // Tests
@@ -219,9 +223,10 @@ fn test_add_vocab() {
 fn test_get_solution() {
     let mut datastore = SqlLiteDatastore::create().unwrap();
     datastore.add_vocab("Door", "Tür").unwrap();
-    let _ = datastore.get_solution(0).is_ok();
+    assert_eq!("Tür", datastore.get_solution("Door".to_string()).unwrap());
 }
 
+/*
 #[test]
 fn test_update() {
     let mut datastore = SqlLiteDatastore::create().unwrap();
@@ -238,6 +243,7 @@ fn test_update() {
         .unwrap();
     datastore.update(id).unwrap();
 }
+*/
 
 #[test]
 // run: cargo test list -- --nocapture
@@ -249,6 +255,6 @@ fn list() {
     println!("  test_add_vocab                  adds new vocabulary");
     println!("  test_create_db                  creates new db");
     println!("  test_get_solution               get the translation of the word");
-    println!("  test_update                     update the count");
+    println!("  (test_update                     update the count)");
     assert!(true);
 }
