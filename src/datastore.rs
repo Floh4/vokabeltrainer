@@ -3,11 +3,12 @@ use rusqlite::Connection;
 use std::path::PathBuf;
 use std::{env, fs};
 
-trait Datastore {
+pub trait Datastore {
     fn add_vocab(&mut self, vocab: &str, translation: &str) -> rusqlite::Result<(), VocabError>;
     //fn update(&mut self, id: u32) -> rusqlite::Result<(), VocabError>;
     fn get_solution(&mut self, word: String) -> rusqlite::Result<String, VocabError>;
     fn id_to_word(&mut self, id: u32) -> Result<String, VocabError>;
+    fn random_id(&self) -> Result<u32, VocabError>;
 }
 
 pub struct SqlLiteDatastore {
@@ -156,6 +157,22 @@ impl Datastore for SqlLiteDatastore {
                 |row| row.get(0),
             )
             .map_err(|e| VocabError::DBError(e))
+    }
+
+    fn random_id(&self) -> Result<u32, VocabError> {
+        use rand::RngExt;
+        let entrys_amount: u32 = self
+            .conn
+            .query_row(
+                "SELECT ID
+                 FROM vocab
+                 ORDER BY ID DESC",
+                [],
+                |row| row.get(0),
+            )
+            .map_err(|e| VocabError::DBError(e))?;
+        let random_id = rand::random_range(1..=entrys_amount);
+        Ok(random_id)
     }
 
     /* This functiom is currently useless, because there is nothing that needs to be updated

@@ -1,11 +1,11 @@
-use datastore::SqlLiteDatastore;
+use datastore::{Datastore, SqlLiteDatastore};
 use rusqlite::Result;
 
 mod datastore;
 mod error;
 
 fn main() -> Result<()> {
-    let datastore = SqlLiteDatastore::create();
+    let datastore = SqlLiteDatastore::create().unwrap();
     // do stuff
 
     Ok(())
