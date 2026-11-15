@@ -109,7 +109,7 @@ impl Datastore for SqlLiteDatastore {
                     self.conn
                         .execute(
                             "INSERT INTO vocab (Vocabulary, Translation, VocabCheckCount, Corect)
-                             VALUES (?1, ?2, 0, 0);",
+                             VALUES (?1, ?2, 0, 0.0);",
                             [vocab, translation],
                         )
                         .map_err(|e| VocabError::DBError(e))?;
@@ -170,31 +170,42 @@ impl Datastore for SqlLiteDatastore {
                 |row| row.get(0),
             )
             .map_err(|e| VocabError::DBError(e))?;
-        //let count: u32 = self
-        //        .conn
-        //        .query_row(
-        //            "SELECT VocabCheckCount
-        //         FROM vocab
-        //         WHERE ID = ?1",
-        //            [id],
-        //            |row| row.get(0),
-        //        )
-        //        .map_err(|e| VocabError::DBError(e))?;
-        //    let corect: u32 = self
-        //        .conn
-        //        .query_row(
-        //            "SELECT Corect
-        //         FROM vocab
-        //         WHERE ID = ?1",
-        //            [id],
-        //            |row| row.get(0),
-        //        )
-        //        .map_err(|e| VocabError::DBError(e))?;
-        //
-        //let succes_rate: f32 = count as f32;
-
-        let random_id = rand::random_range(1..=entrys_amount);
-        Ok(random_id)
+        let mut get_corect = self
+            .conn
+            .prepare(
+                "SELECT Corect
+                 FROM vocab
+                 WHERE ID = ?1",
+            )
+            .map_err(|e| VocabError::DBError(e))?;
+        let mut get_count = self
+            .conn
+            .prepare(
+                "SELECT VocabCheckCount
+                 FROM vocab
+                 WHERE ID = ?1",
+            )
+            .map_err(|e| VocabError::DBError(e))?;
+        loop {
+            // select a random id
+            let id = rand::random_range(1..=entrys_amount);
+            let corect: f32 = get_corect
+                .query_row([id], |row| row.get(0))
+                .map_err(|e| VocabError::DBError(e))?;
+            let count: f32 = get_count
+                .query_row([id], |row| row.get(0))
+                .map_err(|e| VocabError::DBError(e))?;
+            let succes_rate: f32 = if count == 0.0 {
+                // the vocab was never checked before, so it will get selected
+                0.0
+            } else {
+                corect / count as f32
+            };
+            // use succes rate to make probability lower, when the succes rate is high
+            if rand::random_bool((1.0 - succes_rate).into()) {
+                return Ok(id);
+            }
+        }
     }
 
     fn check(&mut self, word: String, input: String) -> rusqlite::Result<f32, VocabError> {
@@ -278,35 +289,27 @@ fn test_get_solution() {
     assert_eq!("Tür", datastore.get_solution("Door".to_string()).unwrap());
 }
 
-/*
 #[test]
-fn test_update() {
-    let mut datastore = SqlLiteDatastore::create().unwrap();
-    datastore.add_vocab("Dog", "Hund").unwrap();
-    let id = datastore
-        .conn
-        .query_row(
-            "SELECT ID
-             FROM vocab
-             WHERE Vocabulary = ?1",
-            ["Dog"],
-            |row| row.get(0),
-        )
-        .unwrap();
-    datastore.update(id).unwrap();
+// run: cargo test test_random_id -- --nocapture
+fn test_random_id() {
+    let datastore = SqlLiteDatastore::create().unwrap();
+    let rid = datastore.random_id().unwrap();
+    println!("{}", rid);
 }
-*/
 
 #[test]
 // run: cargo test list -- --nocapture
 fn list() {
     // lists all available tests
     println!("list                              list all tests");
-    println!("  print_db                        ! run: cargo test -- --nocapture");
+    println!("  print_db                        ! run: cargo test print_db -- --nocapture");
     println!("  reset                           ! use carefully: deletes the database");
     println!("  test_add_vocab                  adds new vocabulary");
     println!("  test_create_db                  creates new db");
     println!("  test_get_solution               get the translation of the word");
+    println!(
+        "  test_random_id                  get a random id ! run: cargo test test_random_id -- --nocapture"
+    );
     println!("  (test_update                     update the count)");
     assert!(true);
 }
