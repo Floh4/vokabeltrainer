@@ -3,10 +3,12 @@ use rusqlite::Connection;
 use std::path::PathBuf;
 use std::{env, fs};
 
-trait Datastore {
+pub trait Datastore {
     fn add_vocab(&mut self, vocab: &str, translation: &str) -> rusqlite::Result<(), VocabError>;
-    fn update(&mut self, id: u32) -> rusqlite::Result<(), VocabError>;
-    fn get_solution(&mut self, id: u32) -> rusqlite::Result<String, VocabError>;
+    //fn update(&mut self, id: u32) -> rusqlite::Result<(), VocabError>;
+    fn get_solution(&mut self, word: String) -> rusqlite::Result<String, VocabError>;
+    fn id_to_word(&mut self, id: u32) -> Result<String, VocabError>;
+    fn random_id(&self) -> Result<u32, VocabError>;
 }
 
 pub struct SqlLiteDatastore {
@@ -20,7 +22,10 @@ impl SqlLiteDatastore {
     pub(crate) fn create() -> rusqlite::Result<Self, VocabError> {
         Self::create_from_path(None, None)
     }
-    fn create_from_path(path: Option<PathBuf>, db_name: Option<&str>) -> rusqlite::Result<Self, VocabError> {
+    fn create_from_path(
+        path: Option<PathBuf>,
+        db_name: Option<&str>,
+    ) -> rusqlite::Result<Self, VocabError> {
         let app_path = match path {
             Some(p) => p,
             None => env::home_dir()
@@ -102,12 +107,12 @@ impl Datastore for SqlLiteDatastore {
                 // vocab doesnt exist
                 {
                     self.conn
-                    .execute(
-                        "INSERT INTO vocab (Vocabulary, Translation, VocabCheckCount, Corect)
-                         VALUES (?1, ?2, 0, 0);",
-                        [vocab, translation],
-                    )
-                    .map_err(|e| VocabError::DBError(e))?;
+                        .execute(
+                            "INSERT INTO vocab (Vocabulary, Translation, VocabCheckCount, Corect)
+                             VALUES (?1, ?2, 0, 0);",
+                            [vocab, translation],
+                        )
+                        .map_err(|e| VocabError::DBError(e))?;
                     Ok(())
                 }
 
@@ -120,60 +125,93 @@ impl Datastore for SqlLiteDatastore {
         }
     }
 
-    fn get_solution(&mut self, id: u32) -> rusqlite::Result<String, VocabError> {
+    fn get_solution(&mut self, word: String) -> rusqlite::Result<String, VocabError> {
         match self.conn.query_row(
             "SELECT Translation
              FROM vocab
-             WHERE ID = ?1",
-            [id],
+             WHERE Vocabulary = ?1",
+            [word],
             |row| row.get::<usize, String>(0),
         ) {
             Ok(v) => {
-                self.update(id)?;
+                //self.update(id)?;
                 Ok(v)
             }
 
             Err(err) => match err {
-                rusqlite::Error::QueryReturnedNoRows => Err(VocabError::General(
-                    "Found no Record with that id".to_string(),
-                )), // This wont need its own error type, because this function wont be using User input
+                rusqlite::Error::QueryReturnedNoRows => {
+                    Err(VocabError::General("Couldnt find the word".to_string()))
+                } // This wont need its own error type, because this function wont be using User input
                 e => Err(VocabError::DBError(e)),
             },
         }
     }
 
-    fn update(&mut self, id: u32) -> rusqlite::Result<(), VocabError> {
-        // add 1 to VocabCheckCount
+    fn id_to_word(&mut self, id: u32) -> Result<String, VocabError> {
         self.conn
-            .execute(
-                "UPDATE vocab
+            .query_row(
+                "SELECT Vocabulary
+                 FROM vocab
+                 WHERE ID = ?1",
+                [id],
+                |row| row.get(0),
+            )
+            .map_err(|e| VocabError::DBError(e))
+    }
+
+    fn random_id(&self) -> Result<u32, VocabError> {
+        use rand::RngExt;
+        let entrys_amount: u32 = self
+            .conn
+            .query_row(
+                "SELECT ID
+                 FROM vocab
+                 ORDER BY ID DESC",
+                [],
+                |row| row.get(0),
+            )
+            .map_err(|e| VocabError::DBError(e))?;
+        let random_id = rand::random_range(1..=entrys_amount);
+        Ok(random_id)
+    }
+
+    /* This functiom is currently useless, because there is nothing that needs to be updated
+        fn update(&mut self, id: u32) -> rusqlite::Result<(), VocabError> {
+            // add 1 to VocabCheckCount
+            self.conn
+                .execute(
+                    "UPDATE vocab
                  SET VocabCheckCount = VocabCheckCount + 1
                  WHERE ID = ?1",
-                [id],
-            )
-            .map_err(|e| VocabError::DBError(e))?;
-        let count: u32 = self
-            .conn
-            .query_row(
-                "SELECT VocabCheckCount
+                    [id],
+                )
+                .map_err(|e| VocabError::DBError(e))?;
+            /*
+             *
+            let count: u32 = self
+                .conn
+                .query_row(
+                    "SELECT VocabCheckCount
                  FROM vocab
                  WHERE ID = ?1",
-                [id],
-                |row| row.get(0),
-            )
-            .map_err(|e| VocabError::DBError(e))?;
-        let corect: u32 = self
-            .conn
-            .query_row(
-                "SELECT Corect
+                    [id],
+                    |row| row.get(0),
+                )
+                .map_err(|e| VocabError::DBError(e))?;
+            let corect: u32 = self
+                .conn
+                .query_row(
+                    "SELECT Corect
                  FROM vocab
                  WHERE ID = ?1",
-                [id],
-                |row| row.get(0),
-            )
-            .map_err(|e| VocabError::DBError(e))?;
-        Ok(())
-    }
+                    [id],
+                    |row| row.get(0),
+                )
+                .map_err(|e| VocabError::DBError(e))?;
+            */
+            Ok(())
+        }
+    */
 }
 
 // Tests
@@ -219,9 +257,10 @@ fn test_add_vocab() {
 fn test_get_solution() {
     let mut datastore = SqlLiteDatastore::create().unwrap();
     datastore.add_vocab("Door", "Tür").unwrap();
-    let _ = datastore.get_solution(0).is_ok();
+    assert_eq!("Tür", datastore.get_solution("Door".to_string()).unwrap());
 }
 
+/*
 #[test]
 fn test_update() {
     let mut datastore = SqlLiteDatastore::create().unwrap();
@@ -238,6 +277,7 @@ fn test_update() {
         .unwrap();
     datastore.update(id).unwrap();
 }
+*/
 
 #[test]
 // run: cargo test list -- --nocapture
@@ -249,6 +289,6 @@ fn list() {
     println!("  test_add_vocab                  adds new vocabulary");
     println!("  test_create_db                  creates new db");
     println!("  test_get_solution               get the translation of the word");
-    println!("  test_update                     update the count");
+    println!("  (test_update                     update the count)");
     assert!(true);
 }
