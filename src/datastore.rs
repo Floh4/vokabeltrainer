@@ -160,7 +160,6 @@ impl Datastore for SqlLiteDatastore {
     }
 
     fn random_id(&self) -> Result<u32, VocabError> {
-        //use rand::RngExt;
         let entrys_amount: u32 = self
             .conn
             .query_row(
