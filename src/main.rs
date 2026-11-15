@@ -5,11 +5,19 @@ mod datastore;
 mod error;
 
 fn main() -> Result<()> {
-    let datastore = SqlLiteDatastore::create().unwrap();
+    let mut datastore = SqlLiteDatastore::create().unwrap();
     // do stuff
+    datastore.add_vocab("Street", "Strasse").unwrap();
+    let a = datastore
+        .check("Street".to_string(), "strase".to_string())
+        .unwrap();
+    println!("{}", a);
 
     Ok(())
 }
+//
+//
+//
 
 /*
 #[test]

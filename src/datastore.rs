@@ -5,7 +5,7 @@ use std::{env, fs};
 
 pub trait Datastore {
     fn add_vocab(&mut self, vocab: &str, translation: &str) -> rusqlite::Result<(), VocabError>;
-    //fn update(&mut self, id: u32) -> rusqlite::Result<(), VocabError>;
+    fn check(&mut self, word: String, input: String) -> rusqlite::Result<f32, VocabError>;
     fn get_solution(&mut self, word: String) -> rusqlite::Result<String, VocabError>;
     fn id_to_word(&mut self, id: u32) -> Result<String, VocabError>;
     fn random_id(&self) -> Result<u32, VocabError>;
@@ -52,7 +52,7 @@ impl SqlLiteDatastore {
                  Vocabulary TEXT,
                  Translation TEXT,
                  VocabCheckCount INTEGER,
-                 Corect INTEGER
+                 Corect FLOAT(16)
                  );",
                 [],
             )
@@ -160,7 +160,7 @@ impl Datastore for SqlLiteDatastore {
     }
 
     fn random_id(&self) -> Result<u32, VocabError> {
-        use rand::RngExt;
+        //use rand::RngExt;
         let entrys_amount: u32 = self
             .conn
             .query_row(
@@ -171,47 +171,66 @@ impl Datastore for SqlLiteDatastore {
                 |row| row.get(0),
             )
             .map_err(|e| VocabError::DBError(e))?;
+        //let count: u32 = self
+        //        .conn
+        //        .query_row(
+        //            "SELECT VocabCheckCount
+        //         FROM vocab
+        //         WHERE ID = ?1",
+        //            [id],
+        //            |row| row.get(0),
+        //        )
+        //        .map_err(|e| VocabError::DBError(e))?;
+        //    let corect: u32 = self
+        //        .conn
+        //        .query_row(
+        //            "SELECT Corect
+        //         FROM vocab
+        //         WHERE ID = ?1",
+        //            [id],
+        //            |row| row.get(0),
+        //        )
+        //        .map_err(|e| VocabError::DBError(e))?;
+        //
+        //let succes_rate: f32 = count as f32;
+
         let random_id = rand::random_range(1..=entrys_amount);
         Ok(random_id)
     }
 
-    /* This functiom is currently useless, because there is nothing that needs to be updated
-        fn update(&mut self, id: u32) -> rusqlite::Result<(), VocabError> {
-            // add 1 to VocabCheckCount
-            self.conn
-                .execute(
-                    "UPDATE vocab
+    fn check(&mut self, word: String, input: String) -> rusqlite::Result<f32, VocabError> {
+        use levenshtein::levenshtein;
+        // add 1 to VocabCheckCount
+        self.conn
+            .execute(
+                "UPDATE vocab
                  SET VocabCheckCount = VocabCheckCount + 1
-                 WHERE ID = ?1",
-                    [id],
-                )
-                .map_err(|e| VocabError::DBError(e))?;
-            /*
-             *
-            let count: u32 = self
-                .conn
-                .query_row(
-                    "SELECT VocabCheckCount
-                 FROM vocab
-                 WHERE ID = ?1",
-                    [id],
-                    |row| row.get(0),
-                )
-                .map_err(|e| VocabError::DBError(e))?;
-            let corect: u32 = self
-                .conn
-                .query_row(
-                    "SELECT Corect
-                 FROM vocab
-                 WHERE ID = ?1",
-                    [id],
-                    |row| row.get(0),
-                )
-                .map_err(|e| VocabError::DBError(e))?;
-            */
-            Ok(())
+                 WHERE Vocabulary = ?1",
+                [&word],
+            )
+            .map_err(|e| VocabError::DBError(e))?;
+        let corect: f32;
+        // prevent zero division
+        if input.len() == 0 {
+            corect = 0.0;
+        } else {
+            let levenshtein_distance = levenshtein(word.as_str(), input.as_str());
+            if levenshtein_distance == 0 {
+                corect = 1.0;
+            } else {
+                corect = levenshtein_distance as f32 / word.chars().count() as f32;
+            }
         }
-    */
+        self.conn
+            .execute(
+                "UPDATE vocab
+                 SET Corect = Corect + ?1
+                 WHERE Vocabulary = ?2",
+                rusqlite::params![corect, &word],
+            )
+            .map_err(|e| VocabError::DBError(e))?;
+        Ok(corect)
+    }
 }
 
 // Tests
