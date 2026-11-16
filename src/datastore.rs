@@ -1,9 +1,9 @@
 use crate::error::VocabError;
 use crate::vocabulary::Vocabulary;
-use rusqlite::{params, Connection, Row};
+use rusqlite::types::{FromSql, FromSqlResult, ValueRef};
+use rusqlite::{Connection, Row, params};
 use std::path::PathBuf;
 use std::{env, fs};
-use rusqlite::types::{FromSql, FromSqlResult, ValueRef};
 
 pub trait Datastore {
     fn add_vocab(&mut self, vocab: &str, translation: &str) -> rusqlite::Result<(), VocabError>;
@@ -14,9 +14,8 @@ pub trait Datastore {
 }
 
 impl From<&Row<'_>> for Vocabulary {
-
     fn from(row: &Row) -> Self {
-        Vocabulary{
+        Vocabulary {
             id: row.get(0).unwrap(),
             vocabulary: row.get(1).unwrap(),
             translation: row.get(2).unwrap(),
@@ -163,7 +162,8 @@ impl Datastore for SqlLiteDatastore {
     }
 
     fn id_to_vocabulary(&mut self, id: u32) -> Result<Vocabulary, VocabError> {
-        let mut vocabulary :Vocabulary = self.conn
+        let mut vocabulary: Vocabulary = self
+            .conn
             .query_row(
                 "SELECT ID, Vocabulary, Translation, VocabCheckCount, Corect
                  FROM vocab
@@ -226,16 +226,21 @@ impl Datastore for SqlLiteDatastore {
     }
 
     fn update_vocab(&mut self, vocab: Vocabulary) -> rusqlite::Result<(), VocabError> {
-        self
-            .conn
+        self.conn
             .execute(
                 "UPDATE vocab
-                    SET Vocabulary = ?2,
-                        Translation = ?3,
-                        VocabCheckCount = ?4,
-                        Corect = ?5
+                 SET Vocabulary = ?2,
+                 Translation = ?3,
+                 VocabCheckCount = ?4,
+                 Corect = ?5
                  WHERE ID = ?1",
-                [u32::to_string(&vocab.id), vocab.vocabulary, vocab.translation, i64::to_string(&vocab.vocab_check_count), f32::to_string(&vocab.correct)]
+                [
+                    u32::to_string(&vocab.id),
+                    vocab.vocabulary,
+                    vocab.translation,
+                    i64::to_string(&vocab.vocab_check_count),
+                    f32::to_string(&vocab.correct),
+                ],
             )
             .map_err(|e| VocabError::DBError(e))?;
         Ok(())

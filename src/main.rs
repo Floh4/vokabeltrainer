@@ -1,6 +1,6 @@
-use std::io;
 use datastore::{Datastore, SqlLiteDatastore};
 use rusqlite::Result;
+use std::io;
 
 mod datastore;
 mod error;
@@ -10,7 +10,9 @@ fn main() -> Result<()> {
     let mut datastore = SqlLiteDatastore::create().unwrap();
     // do stuff
     datastore.add_vocab("Street", "Strasse").unwrap();
-    let mut vocabulary = datastore.id_to_vocabulary(datastore.random_id().unwrap()).unwrap();
+    let mut vocabulary = datastore
+        .id_to_vocabulary(datastore.random_id().unwrap())
+        .unwrap();
     println!("Enter translation for {}", vocabulary.vocabulary);
     let mut buffer = String::new();
     let stdin = io::stdin();
@@ -20,11 +22,3 @@ fn main() -> Result<()> {
     datastore.update_vocab(vocabulary).unwrap();
     Ok(())
 }
-
-/*
-#[test]
-fn test_adding_new_vocab_in_main_rs() {
-    let mut datastore = SqlLiteDatastore::create().unwrap();
-    datastore.add_vocab("Tree", "Baum").is_ok();
-}
-*/

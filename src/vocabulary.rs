@@ -18,15 +18,15 @@ impl Vocabulary {
         if input.len() == 0 {
             corect = 0.0;
         } else {
-            let levenshtein_distance = levenshtein(self.vocabulary.as_str(), input);
+            let levenshtein_distance = levenshtein(self.translation.as_str(), input);
             if levenshtein_distance == 0 {
                 corect = 1.0;
             } else {
-                corect = levenshtein_distance as f32 / self.vocabulary.chars().count() as f32;
+                corect =
+                    1.0 - (levenshtein_distance as f32 / self.translation.chars().count() as f32);
             }
         }
         self.correct += corect;
         Ok(corect)
     }
-
 }
