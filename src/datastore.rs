@@ -1,14 +1,29 @@
 use crate::error::VocabError;
-use rusqlite::Connection;
+use crate::vocabulary::Vocabulary;
+use rusqlite::{params, Connection, Row};
 use std::path::PathBuf;
 use std::{env, fs};
+use rusqlite::types::{FromSql, FromSqlResult, ValueRef};
 
 pub trait Datastore {
     fn add_vocab(&mut self, vocab: &str, translation: &str) -> rusqlite::Result<(), VocabError>;
-    fn check(&mut self, word: String, input: String) -> rusqlite::Result<f32, VocabError>;
     fn get_solution(&mut self, word: String) -> rusqlite::Result<String, VocabError>;
-    fn id_to_word(&mut self, id: u32) -> Result<String, VocabError>;
+    fn id_to_vocabulary(&mut self, id: u32) -> Result<Vocabulary, VocabError>;
     fn random_id(&self) -> Result<u32, VocabError>;
+    fn update_vocab(&mut self, vocab: Vocabulary) -> rusqlite::Result<(), VocabError>;
+}
+
+impl From<&Row<'_>> for Vocabulary {
+
+    fn from(row: &Row) -> Self {
+        Vocabulary{
+            id: row.get(0).unwrap(),
+            vocabulary: row.get(1).unwrap(),
+            translation: row.get(2).unwrap(),
+            vocab_check_count: row.get(3).unwrap(),
+            correct: row.get(4).unwrap(),
+        }
+    }
 }
 
 pub struct SqlLiteDatastore {
@@ -147,16 +162,18 @@ impl Datastore for SqlLiteDatastore {
         }
     }
 
-    fn id_to_word(&mut self, id: u32) -> Result<String, VocabError> {
-        self.conn
+    fn id_to_vocabulary(&mut self, id: u32) -> Result<Vocabulary, VocabError> {
+        let mut vocabulary :Vocabulary = self.conn
             .query_row(
-                "SELECT Vocabulary
+                "SELECT ID, Vocabulary, Translation, VocabCheckCount, Corect
                  FROM vocab
                  WHERE ID = ?1",
                 [id],
-                |row| row.get(0),
+                |row| Ok(row.into()),
             )
-            .map_err(|e| VocabError::DBError(e))
+            .map_err(|e| VocabError::DBError(e))?;
+
+        Ok(vocabulary)
     }
 
     fn random_id(&self) -> Result<u32, VocabError> {
@@ -208,38 +225,20 @@ impl Datastore for SqlLiteDatastore {
         }
     }
 
-    fn check(&mut self, word: String, input: String) -> rusqlite::Result<f32, VocabError> {
-        use levenshtein::levenshtein;
-        // add 1 to VocabCheckCount
-        self.conn
+    fn update_vocab(&mut self, vocab: Vocabulary) -> rusqlite::Result<(), VocabError> {
+        self
+            .conn
             .execute(
                 "UPDATE vocab
-                 SET VocabCheckCount = VocabCheckCount + 1
-                 WHERE Vocabulary = ?1",
-                [&word],
+                    SET Vocabulary = ?2,
+                        Translation = ?3,
+                        VocabCheckCount = ?4,
+                        Corect = ?5
+                 WHERE ID = ?1",
+                [u32::to_string(&vocab.id), vocab.vocabulary, vocab.translation, i64::to_string(&vocab.vocab_check_count), f32::to_string(&vocab.correct)]
             )
             .map_err(|e| VocabError::DBError(e))?;
-        let corect: f32;
-        // prevent zero division
-        if input.len() == 0 {
-            corect = 0.0;
-        } else {
-            let levenshtein_distance = levenshtein(word.as_str(), input.as_str());
-            if levenshtein_distance == 0 {
-                corect = 1.0;
-            } else {
-                corect = levenshtein_distance as f32 / word.chars().count() as f32;
-            }
-        }
-        self.conn
-            .execute(
-                "UPDATE vocab
-                 SET Corect = Corect + ?1
-                 WHERE Vocabulary = ?2",
-                rusqlite::params![corect, &word],
-            )
-            .map_err(|e| VocabError::DBError(e))?;
-        Ok(corect)
+        Ok(())
     }
 }
 
