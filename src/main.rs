@@ -1,3 +1,4 @@
+use crate::vocabulary::Vocabulary;
 use datastore::{Datastore, SqlLiteDatastore};
 use rusqlite::Result;
 use std::io;
@@ -9,7 +10,12 @@ mod vocabulary;
 fn main() -> Result<()> {
     let mut datastore = SqlLiteDatastore::create().unwrap();
     // do stuff
-    datastore.add_vocab("Street", "Strasse").unwrap();
+    let vocab = Vocabulary {
+        vocabulary: String::from("Street"),
+        translation: String::from("Strasse"),
+        ..Default::default()
+    };
+    datastore.add_vocab(vocab).unwrap();
     let mut vocabulary = datastore
         .id_to_vocabulary(datastore.random_id().unwrap())
         .unwrap();
