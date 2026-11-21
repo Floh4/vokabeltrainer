@@ -1,4 +1,3 @@
-use crate::vocabulary::Vocabulary;
 use std::io;
 use datastore::{Datastore, SqlLiteDatastore};
 use rusqlite::Result;
