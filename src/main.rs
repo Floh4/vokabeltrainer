@@ -10,9 +10,12 @@ mod vocabulary;
 fn main() -> Result<()> {
     let mut datastore = SqlLiteDatastore::create_in_memory().unwrap();
     // do stuff
-    datastore.add_vocab("Street", "Strasse").unwrap();
-    datastore.add_vocab("Neighbour", "Nachbar").unwrap();
-    datastore.add_vocab("Cat", "Katze").unwrap();
+    let mut vocab = Vocabulary { vocabulary: "Street".to_string(), translation: "Strasse".to_string(), ..Default::default() };
+    datastore.add_vocab(vocab).unwrap();
+    vocab = Vocabulary { vocabulary: "Neighbour".to_string(), translation: "Nachbar".to_string(), ..Default::default() };
+    datastore.add_vocab(vocab).unwrap();
+    vocab = Vocabulary { vocabulary: "Cat".to_string(), translation: "Katze".to_string(), ..Default::default() };
+    datastore.add_vocab(vocab).unwrap();
     loop {
         let mut vocabulary = datastore
             .id_to_vocabulary(datastore.random_id().unwrap())
