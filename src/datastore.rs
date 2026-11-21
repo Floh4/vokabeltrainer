@@ -7,7 +7,6 @@ use std::{env, fs};
 
 pub trait Datastore {
     fn add_vocab(&mut self, vocab: Vocabulary) -> rusqlite::Result<(), VocabError>;
-    //fn add_vocab(&mut self, vocab: &str, translation: &str, language: &str, vocab_info: Option<&str>, translation_info: Option<&str>, info: Option<&str>) -> rusqlite::Result<(), VocabError>;
     fn get_solution(&mut self, word: String) -> rusqlite::Result<String, VocabError>;
     fn id_to_vocabulary(&mut self, id: u32) -> Result<Vocabulary, VocabError>;
     fn random_id(&self) -> Result<u32, VocabError>;
@@ -114,7 +113,6 @@ impl SqlLiteDatastore {
 
 impl Datastore for SqlLiteDatastore {
     fn add_vocab(&mut self, vocab: Vocabulary) -> rusqlite::Result<(), VocabError> {
-        //fn add_vocab(&mut self, vocab: &str, translation: &str, language: &str, vocab_info: Option<&str>, translation_info: Option<&str>, info: Option<&str>) -> rusqlite::Result<(), VocabError> {
         match self.conn.query_row(
             "SELECT Vocabulary
              FROM vocab
@@ -178,7 +176,7 @@ impl Datastore for SqlLiteDatastore {
         let mut vocabulary: Vocabulary = self
             .conn
             .query_row(
-                "SELECT ID, Vocabulary, Translation, VocabCheckCount, Corect
+                "SELECT *
                  FROM vocab
                  WHERE ID = ?1",
                 [id],
