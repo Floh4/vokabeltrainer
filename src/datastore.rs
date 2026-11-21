@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use std::{env, fs};
 
 pub trait Datastore {
-    fn add_vocab(&mut self, vocab: &str, translation: &str) -> rusqlite::Result<(), VocabError>;
+    fn add_vocab(&mut self, vocab: Vocabulary) -> rusqlite::Result<(), VocabError>;
     fn get_solution(&mut self, word: String) -> rusqlite::Result<String, VocabError>;
     fn id_to_vocabulary(&mut self, id: u32) -> Result<Vocabulary, VocabError>;
     fn random_id(&self) -> Result<u32, VocabError>;
@@ -31,6 +31,11 @@ impl From<&Row<'_>> for Vocabulary {
             translation: row.get(2).unwrap(),
             vocab_check_count: row.get(3).unwrap(),
             correct: row.get(4).unwrap(),
+            language: row.get(5).unwrap(),
+            group: row.get(6).unwrap(),
+            vocab_info: row.get(7).unwrap(),
+            translation_info: row.get(8).unwrap(),
+            info: row.get(9).unwrap(),
         }
     }
 }
@@ -46,6 +51,7 @@ impl SqlLiteDatastore {
     pub(crate) fn create() -> rusqlite::Result<Self, VocabError> {
         Self::create_from_path(None, None)
     }
+
     fn create_from_path(
         path: Option<PathBuf>,
         db_name: Option<&str>,
@@ -80,13 +86,18 @@ impl SqlLiteDatastore {
         println!("Creating tables");
         let size = db
             .execute(
-                "CREATE TABLE vocab (
+                r#"CREATE TABLE vocab (
                  ID INTEGER PRIMARY KEY,
                  Vocabulary TEXT,
                  Translation TEXT,
                  VocabCheckCount INTEGER,
-                 Corect FLOAT(16)
-                 );",
+                 Corect FLOAT(16),
+                 Language TEXT NOT NULL,
+                 "Group" TEXT,
+                 VocabInfo TEXT,
+                 TranslationInfo TEXT,
+                 Info TEXT
+                 );"#,
                 [],
             )
             .map_err(|e| VocabError::DBError(e))?;
@@ -125,12 +136,12 @@ impl SqlLiteDatastore {
 }
 
 impl Datastore for SqlLiteDatastore {
-    fn add_vocab(&mut self, vocab: &str, translation: &str) -> rusqlite::Result<(), VocabError> {
+    fn add_vocab(&mut self, vocab: Vocabulary) -> rusqlite::Result<(), VocabError> {
         match self.conn.query_row(
             "SELECT Vocabulary
              FROM vocab
              WHERE Vocabulary = ?1",
-            [vocab],
+            [&vocab.vocabulary],
             |row| row.get::<usize, String>(0),
         ) {
             Ok(_) =>
@@ -146,9 +157,9 @@ impl Datastore for SqlLiteDatastore {
                 {
                     self.conn
                         .execute(
-                            "INSERT INTO vocab (Vocabulary, Translation, VocabCheckCount, Corect)
-                             VALUES (?1, ?2, 0, 0.0);",
-                            [vocab, translation],
+                            r#"INSERT INTO vocab (Vocabulary, Translation, VocabCheckCount, Corect, Language, "Group",  VocabInfo, TranslationInfo, Info)
+                             VALUES (?1, ?2, 0, 0.0, ?3, ?4, ?5, ?6, ?7);"#,
+                            params![vocab.vocabulary, vocab.translation, vocab.language, vocab.group, vocab.vocab_info, vocab.translation_info, vocab.info],
                         )
                         .map_err(|e| VocabError::DBError(e))?;
                     Ok(())
@@ -189,7 +200,7 @@ impl Datastore for SqlLiteDatastore {
         let mut vocabulary: Vocabulary = self
             .conn
             .query_row(
-                "SELECT ID, Vocabulary, Translation, VocabCheckCount, Corect
+                "SELECT *
                  FROM vocab
                  WHERE ID = ?1",
                 [id],
