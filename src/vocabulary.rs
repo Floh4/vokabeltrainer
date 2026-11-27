@@ -1,7 +1,5 @@
 use crate::error::VocabError;
 
-// TODO: Maybe add an function that takes vocabulary and translation as parameters and returns the struct vocabulary.
-
 pub struct Vocabulary {
     pub(crate) id: u32,
     pub(crate) vocabulary: String,
