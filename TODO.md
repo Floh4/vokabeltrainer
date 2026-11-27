@@ -13,23 +13,7 @@
 
 ### Feature ideas
 
-- [ ] A Column 'Language' to specify the language (sql constraint NOT NULL)
-- [ ] A Column 'Group' to specify eg. the chapter of vocab (can be null)
-- [ ] A Column for extra information about the vocab(can be null)[^1]
-- [ ] A Column for extra information about the translation(can be null)[^1]
-- [ ] A Column for general information (can be null) [^1]
-
-|Vocabulary|Translation|...|Language|Group|VocabInfo|TranslationInfo|Info|
-|--|--|--|--|--|--|--|--|
-|City|Stadt|...|English|Old||A Place with many Houses|eg. Munich|
-|dicere|sagen, sprechen|...|Latin|New|dico, dixi, dictum|
-
-[^1]: print the information when asking for the vocab
-
 ### Decisions
-- [x] select database system 
-  - ~~Network DB (MySQL etc.)?~~
-  - SQLite simple local DB?
 - [ ] User interface
   -  Terminal: [ratatui](https://github.com/ratatui/ratatui)
   -  GUI (e. g. [egui](https://github.com/emilk/egui), looks simple)
@@ -44,6 +28,18 @@
 
 - [x] for now: vocab, translation
 
+
+## 3. technical design
+
+### DB schema
+First go for a naive approach? Simple table with one language
+|German|English|
+|--|--|
+|Hund|Dog|
+
+Mabe more columns with more languages?
+
+### Feature Ideas
 
 #### Provide statistics (success rate)
 |German|English|vocab check count|corect|
@@ -64,13 +60,23 @@ should be a floating value.
 
 For correctness something like [Levenshtein distance](https://en.wikipedia.org/wiki/Levenshtein_distance) could be used. I guess there are libraries available for that.
 
+#### Add columns for information about the vocabulary
 
-## 3. technical design
+- [x] A Column 'Language' to specify the language (sql constraint NOT NULL)
+- [x] A Column 'Group' to specify eg. the chapter of vocab (can be null)
+- [x] A Column for extra information about the vocab(can be null)[^1]
+- [x] A Column for extra information about the translation(can be null)[^1]
+- [x] A Column for general information (can be null) [^1]
 
-### DB schema
-First go for a naive approach? Simple table with one language
-|German|English|
-|--|--|
-|Hund|Dog|
+|Vocabulary|Translation|...|Language|Group|VocabInfo|TranslationInfo|Info|
+|--|--|--|--|--|--|--|--|
+|City|Stadt|...|English|Old||A Place with many Houses|eg. Munich|
+|dicere|sagen, sprechen|...|Latin|New|dico, dixi, dictum|
 
-Mabe more columns with more languages?
+### Decisions
+
+- [x] select database system 
+  - ~~Network DB (MySQL etc.)?~~
+  - SQLite simple local DB?
+
+[^1]: print the information when asking for the vocab
