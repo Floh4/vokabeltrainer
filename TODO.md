@@ -13,6 +13,25 @@
 
 ### Feature ideas
 
+#### Functions to manage vocabulary better
+
+- [ ] function for adding information
+- [ ] function that adds vocabulary, but doesnt take the struct Vocabulary as parameter
+- [ ] function to edit the vocabulary:
+
+  These function can be just in vocabulary.rs and in datastore a function that takes the struct as parameter and just edits everything
+  
+  - [ ] edit just information
+  - [ ] edit the whole vocab
+  - [ ] edit just the translation
+- [ ] function to delete vocabulary
+- [ ] function to list all the vocabulary:
+  - [ ] select by group
+  - [ ] select by language
+  - [ ] select by translation
+  - [ ] select by correctnes
+  - [ ] ...
+
 ### Decisions
 - [ ] User interface
   -  Terminal: [ratatui](https://github.com/ratatui/ratatui)
