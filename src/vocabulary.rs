@@ -6,6 +6,29 @@ pub struct Vocabulary {
     pub(crate) translation: String,
     pub(crate) vocab_check_count: i64,
     pub(crate) correct: f32,
+    pub(crate) language: String,
+    pub(crate) group: Option<String>,
+    pub(crate) vocab_info: Option<String>,
+    pub(crate) translation_info: Option<String>,
+    pub(crate) info: Option<String>,
+}
+
+impl Default for Vocabulary {
+    fn default() -> Self {
+        Vocabulary {
+            id: 1, // it is not recommended to use the default values for add_vocab for the columns
+            // that have the UNIQUE sql constraint
+            vocabulary: "Foo".to_string(),
+            translation: "Bar".to_string(),
+            vocab_check_count: 1,
+            correct: 1.0,
+            language: "Rust".to_string(),
+            group: None,
+            vocab_info: None,
+            translation_info: None,
+            info: None,
+        }
+    }
 }
 
 impl Vocabulary {
@@ -18,7 +41,7 @@ impl Vocabulary {
         if input.len() == 0 {
             corect = 0.0;
         } else {
-            let levenshtein_distance = levenshtein(self.translation.as_str(), input);
+            let levenshtein_distance = levenshtein(&self.translation, input);
             if levenshtein_distance == 0 {
                 corect = 1.0;
             } else {
@@ -28,5 +51,13 @@ impl Vocabulary {
         }
         self.correct += corect;
         Ok(corect)
+    }
+}
+
+pub fn add(vocabulary: &str, translation: &str) -> Vocabulary {
+    Vocabulary {
+        vocabulary: vocabulary.to_string(),
+        translation: translation.to_string(),
+        ..Default::default()
     }
 }

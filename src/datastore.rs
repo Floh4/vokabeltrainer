@@ -6,22 +6,21 @@ use std::path::PathBuf;
 use std::{env, fs};
 
 pub trait Datastore {
-    fn add_vocab(&mut self, vocab: &str, translation: &str) -> rusqlite::Result<(), VocabError>;
+    fn add_vocab(&mut self, vocab: Vocabulary) -> rusqlite::Result<(), VocabError>;
+
+    // is this function still necessary when id_to_word returns the struct with everything?
     fn get_solution(&mut self, word: String) -> rusqlite::Result<String, VocabError>;
+
     fn id_to_vocabulary(&mut self, id: u32) -> Result<Vocabulary, VocabError>;
     fn random_id(&self) -> Result<u32, VocabError>;
     fn update_vocab(&mut self, vocab: Vocabulary) -> rusqlite::Result<(), VocabError>;
 }
 
-enum StorageType
-{
+#[derive(Debug)]
+enum StorageType {
     Memory,
-    FileSystem {
-        app_dir: PathBuf,
-        db_name: String
-    },
+    FileSystem { app_dir: PathBuf, db_name: String },
 }
-
 
 impl From<&Row<'_>> for Vocabulary {
     fn from(row: &Row) -> Self {
@@ -31,6 +30,11 @@ impl From<&Row<'_>> for Vocabulary {
             translation: row.get(2).unwrap(),
             vocab_check_count: row.get(3).unwrap(),
             correct: row.get(4).unwrap(),
+            language: row.get(5).unwrap(),
+            group: row.get(6).unwrap(),
+            vocab_info: row.get(7).unwrap(),
+            translation_info: row.get(8).unwrap(),
+            info: row.get(9).unwrap(),
         }
     }
 }
@@ -59,20 +63,25 @@ impl SqlLiteDatastore {
                 .join(SqlLiteDatastore::DB_PATH_FROM_HOME),
         };
         let db_name = db_name.unwrap_or(SqlLiteDatastore::DB_NAME).to_string();
-        let conn = SqlLiteDatastore::initialize(StorageType::FileSystem {
-            app_dir, db_name
-        } )?;
+        let conn = SqlLiteDatastore::initialize(StorageType::FileSystem { app_dir, db_name })?;
         Ok(SqlLiteDatastore { conn })
     }
 
     pub(crate) fn create_in_memory() -> rusqlite::Result<Self, VocabError> {
-        Ok(SqlLiteDatastore {conn: SqlLiteDatastore::create_db(&StorageType::Memory)?})
+        Ok(SqlLiteDatastore {
+            conn: SqlLiteDatastore::create_db(&StorageType::Memory)?,
+        })
     }
 
     fn create_db(storage_type: &StorageType) -> rusqlite::Result<Connection, VocabError> {
         let db = match storage_type {
-            StorageType::FileSystem { app_dir: path, db_name: name } => Connection::open(path).map_err(|e| VocabError::DBError(e))?,
-            StorageType::Memory => Connection::open_in_memory().map_err(|e| VocabError::DBError(e))?,
+            StorageType::FileSystem {
+                app_dir: path,
+                db_name: name,
+            } => Connection::open(path.join(name)).map_err(|e| VocabError::DBError(e))?,
+            StorageType::Memory => {
+                Connection::open_in_memory().map_err(|e| VocabError::DBError(e))?
+            }
         };
         println!("Succesfully created new database!");
 
@@ -80,13 +89,18 @@ impl SqlLiteDatastore {
         println!("Creating tables");
         let size = db
             .execute(
-                "CREATE TABLE vocab (
+                r#"CREATE TABLE vocab (
                  ID INTEGER PRIMARY KEY,
                  Vocabulary TEXT,
                  Translation TEXT,
                  VocabCheckCount INTEGER,
-                 Corect FLOAT(16)
-                 );",
+                 Corect FLOAT(16),
+                 Language TEXT NOT NULL,
+                 "Group" TEXT,
+                 VocabInfo TEXT,
+                 TranslationInfo TEXT,
+                 Info TEXT
+                 );"#,
                 [],
             )
             .map_err(|e| VocabError::DBError(e))?;
@@ -97,7 +111,10 @@ impl SqlLiteDatastore {
     fn initialize(storage_type: StorageType) -> rusqlite::Result<Connection, VocabError> {
         match storage_type {
             StorageType::Memory => SqlLiteDatastore::create_db(&storage_type),
-            StorageType::FileSystem { ref app_dir, ref db_name } => {
+            StorageType::FileSystem {
+                ref app_dir,
+                ref db_name,
+            } => {
                 let db_path = app_dir.join(db_name);
                 if !app_dir.is_dir() {
                     // app is run for the first time
@@ -125,12 +142,12 @@ impl SqlLiteDatastore {
 }
 
 impl Datastore for SqlLiteDatastore {
-    fn add_vocab(&mut self, vocab: &str, translation: &str) -> rusqlite::Result<(), VocabError> {
+    fn add_vocab(&mut self, vocab: Vocabulary) -> rusqlite::Result<(), VocabError> {
         match self.conn.query_row(
             "SELECT Vocabulary
              FROM vocab
              WHERE Vocabulary = ?1",
-            [vocab],
+            [&vocab.vocabulary],
             |row| row.get::<usize, String>(0),
         ) {
             Ok(_) =>
@@ -146,9 +163,9 @@ impl Datastore for SqlLiteDatastore {
                 {
                     self.conn
                         .execute(
-                            "INSERT INTO vocab (Vocabulary, Translation, VocabCheckCount, Corect)
-                             VALUES (?1, ?2, 0, 0.0);",
-                            [vocab, translation],
+                            r#"INSERT INTO vocab (Vocabulary, Translation, VocabCheckCount, Corect, Language, "Group",  VocabInfo, TranslationInfo, Info)
+                             VALUES (?1, ?2, 0, 0.0, ?3, ?4, ?5, ?6, ?7);"#,
+                            params![vocab.vocabulary, vocab.translation, vocab.language, vocab.group, vocab.vocab_info, vocab.translation_info, vocab.info],
                         )
                         .map_err(|e| VocabError::DBError(e))?;
                     Ok(())
@@ -189,7 +206,7 @@ impl Datastore for SqlLiteDatastore {
         let mut vocabulary: Vocabulary = self
             .conn
             .query_row(
-                "SELECT ID, Vocabulary, Translation, VocabCheckCount, Corect
+                "SELECT *
                  FROM vocab
                  WHERE ID = ?1",
                 [id],
@@ -280,7 +297,8 @@ fn test_create_db() {
 #[test]
 // run: cargo test print_db -- --nocapture
 fn print_db() {
-    let datastore = SqlLiteDatastore::create_in_memory().unwrap();
+    let datastore = SqlLiteDatastore::create().unwrap(); // dont open in memory, because
+    // because this function prints the database in storage
     let mut stmt = datastore.conn.prepare("SELECT * FROM vocab").unwrap();
     let mut rows = stmt.query([]).unwrap();
     while let Some(row) = rows.next().unwrap() {
@@ -293,15 +311,16 @@ fn reset() {
     let path = env::home_dir()
         .unwrap()
         .join(SqlLiteDatastore::DB_PATH_FROM_HOME);
-    if(path.exists()){
+    if path.exists() {
         fs::remove_dir_all(path).unwrap();
     }
 }
 
 #[test]
 fn test_add_vocab() {
+    use crate::vocabulary::add;
     let mut datastore = SqlLiteDatastore::create_in_memory().unwrap();
-    let result = datastore.add_vocab("Dog", "Hund");
+    let result = datastore.add_vocab(add("Tree", "Baum"));
     match result {
         Ok(()) => assert!(true),
         Err(e) => match e {
@@ -314,16 +333,18 @@ fn test_add_vocab() {
 
 #[test]
 fn test_get_solution() {
+    use crate::vocabulary::add;
     let mut datastore = SqlLiteDatastore::create_in_memory().unwrap();
-    datastore.add_vocab("Door", "Tür").unwrap();
+    datastore.add_vocab(add("Door", "Tür")).unwrap();
     assert_eq!("Tür", datastore.get_solution("Door".to_string()).unwrap());
 }
 
 #[test]
 // run: cargo test test_random_id -- --nocapture
 fn test_random_id() {
+    use crate::vocabulary::add;
     let mut datastore = SqlLiteDatastore::create_in_memory().unwrap();
-    assert!(datastore.add_vocab("Dog", "Hund").is_ok());
+    assert!(datastore.add_vocab(add("Dog", "Hund")).is_ok());
     let rid = datastore.random_id().unwrap();
     println!("{}", rid);
 }
