@@ -318,7 +318,7 @@ fn reset() {
 
 #[test]
 fn test_add_vocab() {
-use crate::vocabulary::add;
+    use crate::vocabulary::add;
     let mut datastore = SqlLiteDatastore::create_in_memory().unwrap();
     let result = datastore.add_vocab(add("Tree", "Baum"));
     match result {
@@ -333,7 +333,7 @@ use crate::vocabulary::add;
 
 #[test]
 fn test_get_solution() {
-use crate::vocabulary::add;
+    use crate::vocabulary::add;
     let mut datastore = SqlLiteDatastore::create_in_memory().unwrap();
     datastore.add_vocab(add("Door", "Tür")).unwrap();
     assert_eq!("Tür", datastore.get_solution("Door".to_string()).unwrap());
@@ -342,7 +342,7 @@ use crate::vocabulary::add;
 #[test]
 // run: cargo test test_random_id -- --nocapture
 fn test_random_id() {
-use crate::vocabulary::add;
+    use crate::vocabulary::add;
     let mut datastore = SqlLiteDatastore::create_in_memory().unwrap();
     assert!(datastore.add_vocab(add("Dog", "Hund")).is_ok());
     let rid = datastore.random_id().unwrap();
